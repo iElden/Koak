@@ -9,7 +9,7 @@ $(NAME):
 	cp `stack path | grep local-install-root | cut -f 2 -d ':'`/bin/$(BIN_NAME) ./$(NAME)
 
 clean:
-	echo "Tout est maintenant tout beau tout propre !"
+	@echo "Tout est maintenant tout beau tout propre !"
 
 fclean:
 	$(RM) $(NAME)
