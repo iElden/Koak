@@ -1,12 +1,10 @@
 NAME = koak
 
-BIN_NAME = koak-exe
-
 all:	$(NAME)
 
 $(NAME):
-	stack build
-	cp `stack path | grep local-install-root | cut -f 2 -d ':'`/bin/$(BIN_NAME) ./$(NAME)
+	cabal build
+	cp dist-newstyle/build/x86_64-linux/ghc-8.6.5/llvm-demo-0.1.0.0/x/llvm-demo/build/llvm-demo/llvm-demo ./$(NAME)
 
 clean:
 	@echo "Tout est maintenant tout beau tout propre !"
