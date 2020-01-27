@@ -102,3 +102,9 @@ parseDouble = Parse $ \s -> do
 parseRealNumber :: Parser Literal
 parseRealNumber = Parse $ \s -> do
     runParser (parseNumber <|> parseDouble) s
+
+parseIdentifier :: Parser String
+parseIdentifier = Parse $ \s -> do
+    (c, remain) <- runParser (parseChar (['a'..'z'] ++ ['A'..'Z'])) s
+    (str, remain2) <- runParser (many $ parseChar (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])) remain
+    return (c:str, remain2)
