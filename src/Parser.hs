@@ -1,6 +1,13 @@
 module Parser(
     Parser (..),
     runParser,
+    parseChar,
+    parseCharBlackList,
+    parseCharSequence,
+    parseInteger,
+    parseDouble,
+    parseLiteral,
+    parseIdentifier
 ) where
 
 import AST
@@ -71,8 +78,8 @@ parseDouble = do
         pure ("0" ++ intPart ++ "." ++ decPart ++ "0")
     maybe empty (pure . RealNbr) nbr
 
-parseRealNumber :: Parser Literal
-parseRealNumber = parseDouble <|> parseInteger
+parseLiteral :: Parser Literal
+parseLiteral = parseDouble <|> parseInteger
 
 parseIdentifier :: Parser String
 parseIdentifier =
