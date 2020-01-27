@@ -64,16 +64,41 @@ parseChar list = Parse $ parse list
             | elem c list = return (c, str)
             | otherwise = Nothing
 
+parseCharBlackList :: String -> Parser Char
+parseCharBlackList list = Parse $ parse list
+    where
+        parse _ "" = Nothing
+        parse list (c:str)
+            | elem c list = Nothing
+            | otherwise = return (c, str)
 
+parseCharSequence :: String -> Parser String
+parseCharSequence str = combineParsers $ createParsers str
+    where
+        createParsers "" = []
+        createParsers (c:str) = [parseChar [c]] ++ (createParsers str)
 
 parseNumber :: Parser Literal
-parseNumber = Parse (\s -> do
-    (nbr, remain) <- runParser (many $ parseChar "0123456789") s
-    nbr <- readMaybe nbr :: Maybe Int
-    return (Nbr nbr, remain))
+parseNumber = Parse $ \s -> do
+    (nbr, remain) <- runParser (many $ parseChar ['0'..'9']) s
+    case runParser (parseCharBlackList []) remain of
+        Just ('.', _) -> Nothing
+        _ -> do
+            nbr <- readMaybe nbr :: Maybe Int
+            return (Nbr nbr, remain)
+
+parseDouble :: Parser Literal
+parseDouble = Parse $ \s -> do
+    (nbr, remain) <- runParser (
+        combineParsers (
+            [some $ parseChar ['0'..'9'], parseCharSequence ".",  many $ parseChar ['0'..'9']]
+        ) <|> combineParsers (
+            [parseCharSequence ".",  some $ parseChar ['0'..'9']]
+        )
+        ) s
+    nbr <- readMaybe $ "0" ++ (foldl (++) "" nbr) ++ "0" :: Maybe Double
+    return (RealNbr nbr, remain)
 
 parseRealNumber :: Parser Literal
-parseRealNumber = Parse (\s -> do
-    (nbr, remain) <- runParser (combineParsers [many $ parseChar "0123456789", myOptional $ parseChar ".", many $ parseChar "0123456789"]) s
-    nbr <- readMaybe $ foldl (++) "" nbr :: Maybe Double
-    return (RealNbr nbr, remain))
+parseRealNumber = Parse $ \s -> do
+    runParser (parseNumber <|> parseDouble) s
