@@ -37,25 +37,6 @@ instance Alternative Parser where
 runParser :: Parser a -> String -> Maybe (a, String)
 runParser (Parse f) s = f s
 
-myOptional :: Parser a -> Parser [a]
-myOptional f = Parse (\s -> do
-    (v, remain) <- runParser (optional f) s
-    return (maybeToList v, remain))
-
-combineParsers :: [Parser a] -> Parser [a]
-combineParsers parsers = Parse (\s -> case go parsers s of
-    Just ([], _) -> Nothing
-    val -> val)
-    where
-        go [] s = return ([], s)
-        go ((Parse parser):others) s = do
-            (v, remain) <- parser s
-            (val, remain) <- go others remain
-            return ([v] ++ val, remain)
-
-combineResults :: Parser [[a]] -> Parser [a]
-combineResults = fmap $ foldl (++) []
-
 parseChar :: String -> Parser Char
 parseChar list = Parse $ parse list
     where
@@ -73,35 +54,29 @@ parseCharBlackList list = Parse $ parse list
             | otherwise = return (c, str)
 
 parseCharSequence :: String -> Parser String
-parseCharSequence str = combineParsers $ createParsers str
-    where
-        createParsers "" = []
-        createParsers (c:str) = [parseChar [c]] ++ (createParsers str)
+parseCharSequence "" = pure ""
+parseCharSequence (c:str) = do
+    c1 <- parseChar [c]
+    s1 <- parseCharSequence str
+    pure (c1:s1)
 
-parseNumber :: Parser Literal
-parseNumber = Parse $ \s -> do
-    (nbr, remain) <- runParser (many $ parseChar ['0'..'9']) s
-    case runParser (parseCharBlackList []) remain of
-        Just ('.', _) -> Nothing
-        _ -> do
-            nbr <- readMaybe nbr :: Maybe Int
-            return (Nbr nbr, remain)
+parseInteger :: Parser Literal
+parseInteger = do
+    intPart <- fmap (readMaybe :: String -> Maybe Int) $ many $ parseChar ['0'..'9']
+    maybe empty (pure . Nbr) intPart
 
 parseDouble :: Parser Literal
-parseDouble = Parse $ \s -> do
-    (nbr, remain) <- runParser (
-        combineParsers (
-            [some $ parseChar ['0'..'9'], parseCharSequence ".",  many $ parseChar ['0'..'9']]
-        ) <|> combineParsers (
-            [parseCharSequence ".",  some $ parseChar ['0'..'9']]
-        )
-        ) s
-    nbr <- readMaybe $ "0" ++ (foldl (++) "" nbr) ++ "0" :: Maybe Double
-    return (RealNbr nbr, remain)
+parseDouble = do
+    nbr <- fmap (readMaybe :: String -> Maybe Double) $ do
+        intPart <- many $ parseChar ['0'..'9']
+        _ <- parseChar "."
+        decPart <- many $ parseChar ['0'..'9']
+        pure ("0" ++ intPart ++ "." ++ decPart ++ "0")
+    maybe empty (pure . RealNbr) nbr
 
 parseRealNumber :: Parser Literal
 parseRealNumber = Parse $ \s -> do
-    runParser (parseNumber <|> parseDouble) s
+    runParser (parseDouble <|> parseInteger) s
 
 parseIdentifier :: Parser String
 parseIdentifier = Parse $ \s -> do
