@@ -55,19 +55,16 @@ parseCharBlackList list = Parse $ parse list
 
 parseCharSequence :: String -> Parser String
 parseCharSequence "" = pure ""
-parseCharSequence (c:str) = do
-    c1 <- parseChar [c]
-    s1 <- parseCharSequence str
-    return (c1:s1)
+parseCharSequence (c:str) = (:) <$> parseChar [c] <*> parseCharSequence str
 
 parseInteger :: Parser Literal
 parseInteger = do
-    intPart <- fmap (readMaybe :: String -> Maybe Int) $ many $ parseChar ['0'..'9']
+    intPart <- (readMaybe :: String -> Maybe Int) <$> (many $ parseChar ['0'..'9'])
     maybe empty (pure . Nbr) intPart
 
 parseDouble :: Parser Literal
 parseDouble = do
-    nbr <- fmap (readMaybe :: String -> Maybe Double) $ do
+    nbr <- (readMaybe :: String -> Maybe Double) <$> do
         intPart <- many $ parseChar ['0'..'9']
         _ <- parseChar "."
         decPart <- many $ parseChar ['0'..'9']
@@ -78,7 +75,5 @@ parseRealNumber :: Parser Literal
 parseRealNumber = parseDouble <|> parseInteger
 
 parseIdentifier :: Parser String
-parseIdentifier = do
-    c <-parseChar $ ['a'..'z'] ++ ['A'..'Z']
-    str <- many $ parseChar $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
-    return $ c:str
+parseIdentifier =
+    (:) <$> (parseChar $ ['a'..'z'] ++ ['A'..'Z']) <*> (many $ parseChar $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
