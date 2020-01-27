@@ -1,7 +1,6 @@
 module Parser(
     Parser (..),
     runParser,
-    runParser,
     parseChar,
     parseCharBlackList,
     parseCharSequence,
