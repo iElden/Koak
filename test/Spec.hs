@@ -1,5 +1,13 @@
 import Test.Hspec
+import ParserSpec
 
 main :: IO ()
 main = hspec $ do
-    return ()
+    parseIdentifierTest
+    parseLiteralTest
+    parseDoubleTest
+    parseIntegerTest
+    parseCharSequenceTest
+    parseCharBlackListTest
+    parseCharTest
+

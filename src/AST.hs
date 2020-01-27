@@ -75,7 +75,7 @@ data Unary =
 data Literal =
     Nbr Int |
     RealNbr Double
-    deriving Show
+    deriving (Show, Eq)
 
 data Primary =
     Var Identifier |
