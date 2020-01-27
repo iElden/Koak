@@ -58,7 +58,7 @@ parseCharSequence "" = pure ""
 parseCharSequence (c:str) = do
     c1 <- parseChar [c]
     s1 <- parseCharSequence str
-    pure (c1:s1)
+    return (c1:s1)
 
 parseInteger :: Parser Literal
 parseInteger = do
@@ -75,11 +75,10 @@ parseDouble = do
     maybe empty (pure . RealNbr) nbr
 
 parseRealNumber :: Parser Literal
-parseRealNumber = Parse $ \s -> do
-    runParser (parseDouble <|> parseInteger) s
+parseRealNumber = parseDouble <|> parseInteger
 
 parseIdentifier :: Parser String
-parseIdentifier = Parse $ \s -> do
-    (c, remain) <- runParser (parseChar (['a'..'z'] ++ ['A'..'Z'])) s
-    (str, remain2) <- runParser (many $ parseChar (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])) remain
-    return (c:str, remain2)
+parseIdentifier = do
+    c <-parseChar $ ['a'..'z'] ++ ['A'..'Z']
+    str <- many $ parseChar $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9']
+    return $ c:str
