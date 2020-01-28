@@ -65,8 +65,8 @@ instance Show BinaryOp where
     show Neq = "!="
     show Gt = ">"
     show Gte = ">="
-    show Lt = ">"
-    show Lte = ">="
+    show Lt = "<"
+    show Lte = "<="
     show Asg = "="
 
 
@@ -95,7 +95,7 @@ instance Show Value where
     show (Nbr n) = show n
     show (RealNbr n) = show n
     show (GlobVar n) = '@':n
-    show (Var t n) = show t ++ ' ':n
+    show (Var t n) = n ++ ": " ++ show t
     show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
 
@@ -128,6 +128,6 @@ data Expression =
 
 instance Show Expression where
     show (Un unary) = show unary ++ ";"
-    show (Expr unary op expr) = show unary ++ show op ++ show expr ++ ";"
+    show (Expr unary op expr) = show unary ++ show op ++ show expr
     show (Fct fct) = show fct
     show (ExtFct fct) = "extern " ++ show fct ++ ";"

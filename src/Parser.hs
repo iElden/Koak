@@ -64,6 +64,10 @@ parseCharSequence :: String -> Parser String
 parseCharSequence "" = pure ""
 parseCharSequence (c:str) = (:) <$> parseChar [c] <*> parseCharSequence str
 
+parseString :: [String] -> Parser String
+parseString [] = empty
+parseString (v:others) = parseCharSequence v <|> parseString others
+
 parseDigit :: Parser Char
 parseDigit = parseChar ['0'..'9']
 
@@ -72,6 +76,9 @@ parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
 
 parseAlphaNum :: Parser Char
 parseAlphaNum = parseDigit <|> parseAlpha
+
+parseWhiteSpace :: Parser Char
+parseWhiteSpace = parseChar " \t\n"
 
 parseInteger :: Parser Value
 parseInteger = do
@@ -87,8 +94,49 @@ parseDouble = do
         return $ "0" ++ intPart ++ "." ++ decPart ++ "0"
     maybe empty (pure . RealNbr) nbr
 
-parseLiteral :: Parser Value
-parseLiteral = parseDouble <|> parseInteger
+parseIdentifier :: Parser Value
+parseIdentifier = GlobVar <$> ((:) <$> parseAlpha <*> many parseAlphaNum)
 
-parseIdentifier :: Parser String
-parseIdentifier = (:) <$> parseAlpha <*> many parseAlphaNum
+parseBinOp :: Parser BinaryOp
+parseBinOp = do
+    test <- many parseWhiteSpace *> parseString ["+", "-", "**", "*", "/", "&", "|", "^", "%", ">>", "<<", "==", "!=", "<=", "<", ">=", ">", "="]
+    case test of
+        "+" -> return Add
+        "-" -> return Sub
+        "*" -> return Mul
+        "/" -> return Div
+        "&" -> return And
+        "|" -> return Or
+        "^" -> return Xor
+        "**" -> return Pow
+        "%" -> return Mod
+        ">>" -> return RSh
+        "<<" -> return LSh
+        "==" -> return Equ
+        "!=" -> return Neq
+        ">" -> return Gt
+        ">=" -> return Gte
+        "<" -> return Lt
+        "<=" -> return Lte
+        "=" -> return Asg
+
+parseUnOp :: Parser UnaryOp
+parseUnOp = do
+    test <- many parseWhiteSpace *> parseString ["+", "-", "!", "~"]
+    case test of
+        "+" -> return Plus
+        "-" -> return Minus
+        "!" -> return BoolNot
+        "~" -> return BinNot
+
+parseBinExpr :: Parser Expression
+parseBinExpr = Expr <$> (many parseWhiteSpace *> parseUnary <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
+
+parseExpression :: Parser Expression
+parseExpression = parseBinExpr <|> Un <$> parseUnary
+
+parseUnary :: Parser Unary
+parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
+
+parseLiteral :: Parser Value
+parseLiteral = parseDouble <|> parseInteger <|> parseIdentifier
