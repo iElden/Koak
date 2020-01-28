@@ -152,4 +152,4 @@ parseUnary :: Parser Unary
 parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
 
 parseLiteral :: Parser Value
-parseLiteral = parseDouble <|> parseInteger <|> parseIdentifier
+parseLiteral = parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
