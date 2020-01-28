@@ -64,23 +64,31 @@ parseCharSequence :: String -> Parser String
 parseCharSequence "" = pure ""
 parseCharSequence (c:str) = (:) <$> parseChar [c] <*> parseCharSequence str
 
-parseInteger :: Parser Literal
+parseDigit :: Parser Char
+parseDigit = parseChar ['0'..'9']
+
+parseAlpha :: Parser Char
+parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
+
+parseAlphaNum :: Parser Char
+parseAlphaNum = parseDigit <|> parseAlpha
+
+parseInteger :: Parser Value
 parseInteger = do
-    intPart <- (readMaybe :: String -> Maybe Int) <$> (many $ parseChar ['0'..'9'])
+    intPart <- (readMaybe :: String -> Maybe Int) <$> many parseDigit
     maybe empty (pure . Nbr) intPart
 
-parseDouble :: Parser Literal
+parseDouble :: Parser Value
 parseDouble = do
     nbr <- (readMaybe :: String -> Maybe Double) <$> do
-        intPart <- many $ parseChar ['0'..'9']
+        intPart <- many parseDigit
         _ <- parseChar "."
-        decPart <- many $ parseChar ['0'..'9']
-        pure ("0" ++ intPart ++ "." ++ decPart ++ "0")
+        decPart <- many parseDigit
+        return $ "0" ++ intPart ++ "." ++ decPart ++ "0"
     maybe empty (pure . RealNbr) nbr
 
-parseLiteral :: Parser Literal
+parseLiteral :: Parser Value
 parseLiteral = parseDouble <|> parseInteger
 
 parseIdentifier :: Parser String
-parseIdentifier =
-    (:) <$> (parseChar $ ['a'..'z'] ++ ['A'..'Z']) <*> (many $ parseChar $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
+parseIdentifier = (:) <$> parseAlpha <*> many parseAlphaNum

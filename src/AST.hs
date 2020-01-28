@@ -1,47 +1,33 @@
 module AST (
     Type (..),
     BinaryOp (..),
-    Expression (..),
-    Unary (..),
-    Literal (..),
-    Primary (..),
-    FctProto (..),
     UnaryOp (..),
-    Expressions (..),
-    KoakAST (..),
-    Identifier,
-    CallExpr,
-    PostFix,
-    FctParam,
-    FctProtoArgs,
-    Function,
-    ForExpr,
-    IfExpr,
-    WhileExpr
+    Value (..),
+    Unary (..),
+    FunctionPrototype (..),
+    FunctionDeclaration (..),
+    Expression (..),
     ) where
 
-type Identifier = String
-type CallExpr = [Expression]
-type PostFix =
-    (Primary, Maybe CallExpr)
-type FctParam =
-    (Identifier, Type)
-type FctProtoArgs =
-    ([FctParam], Type)
-type Function =
-    (FctProto, FctProtoArgs, Expressions)
-type ForExpr =
-    (Identifier, Expression, Identifier, Expression, Expression, Expressions)
-type IfExpr =
-    (Expression, Expressions, Maybe Expressions)
-type WhileExpr =
-    (Expression, Expressions)
+
+import Data.List
+
+
+dispList :: Show a => String -> [a] -> String
+dispList sep list = intercalate sep $ fmap show list
 
 data Type =
-    Number |
-    RealNumber |
-    Void
-    deriving Show
+    Void |
+    IntegerVar |
+    FloatingVar |
+    Function Type [Type]
+
+instance Show Type where
+    show Void = "void"
+    show IntegerVar = "int"
+    show FloatingVar = "double"
+    show (Function retVal args) = "function(" ++ dispList ", " args ++ "): " ++ show retVal
+
 
 data BinaryOp =
     Add |
@@ -62,49 +48,86 @@ data BinaryOp =
     Lt  |
     Lte |
     Asg
-    deriving Show
 
-data Expression =
-    E Unary [(BinaryOp, Either Unary Expression)]
-    deriving Show
+instance Show BinaryOp where
+    show Add = "+"
+    show Sub = "-"
+    show Mul = "*"
+    show Div = "/"
+    show And = "&"
+    show Or = "|"
+    show Xor = "^"
+    show Pow = "**"
+    show Mod = "%"
+    show RSh = ">>"
+    show LSh = "<<"
+    show Equ = "=="
+    show Neq = "!="
+    show Gt = ">"
+    show Gte = ">="
+    show Lt = ">"
+    show Lte = ">="
+    show Asg = "="
 
-data Unary =
-    Una UnaryOp (Either Unary PostFix)
-    deriving Show
-
-data Literal =
-    Nbr Int |
-    RealNbr Double
-    deriving Show
-
-data Primary =
-    Var Identifier |
-    Lit Literal |
-    Ex Expressions
-    deriving Show
-
-data FctProto =
-    Un Int |
-    Bin Int |
-    Iden Identifier
-    deriving Show
 
 data UnaryOp =
     BinNot  |
     BoolNot |
     Minus   |
     Plus
-    deriving Show
 
-data Expressions =
-    For ForExpr |
-    If IfExpr |
-    While WhileExpr |
-    Expr Expression [Expression]
-    deriving Show
+instance Show UnaryOp where
+    show BinNot = "~"
+    show BoolNot = "!"
+    show Minus = "-"
+    show Plus = "+"
 
-data KoakAST =
-    Fct Function |
-    Exp Expression
-    deriving Show
 
+data Value =
+    Nbr Int |
+    RealNbr Double |
+    GlobVar String |
+    Var Type String |
+    GlobCall String [Value] |
+    Call FunctionPrototype [Value]
+
+instance Show Value where
+    show (Nbr n) = show n
+    show (RealNbr n) = show n
+    show (GlobVar n) = '@':n
+    show (Var t n) = show t ++ ' ':n
+    show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
+    show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
+
+
+data Unary = Unary [UnaryOp] Value
+
+instance Show Unary where
+    show (Unary ops v) = dispList "" ops ++ show v
+
+
+data FunctionPrototype =
+    Proto String Type [(String, Type)]
+
+instance Show FunctionPrototype where
+    show (Proto name retType args) = name ++ "(" ++ (intercalate ", " $ fmap (\(name, t) -> name ++ ": " ++ show t) args) ++ "): " ++ show retType
+
+
+data FunctionDeclaration =
+    Decl FunctionPrototype [Expression]
+
+instance Show FunctionDeclaration where
+    show (Decl proto exprs) = show proto ++ " {\n" ++ dispList "\n" exprs ++ "}"
+
+
+data Expression =
+    ExtFct FunctionPrototype |
+    Fct FunctionDeclaration |
+    Expr Unary BinaryOp Expression |
+    Un Unary
+
+instance Show Expression where
+    show (Un unary) = show unary ++ ";"
+    show (Expr unary op expr) = show unary ++ show op ++ show expr ++ ";"
+    show (Fct fct) = show fct
+    show (ExtFct fct) = "extern " ++ show fct ++ ";"
