@@ -97,6 +97,19 @@ parseDouble = do
 parseIdentifier :: Parser Value
 parseIdentifier = GlobVar <$> ((:) <$> parseAlpha <*> many parseAlphaNum)
 
+parseType :: Parser Type
+parseType = do
+    t <- (:) <$> parseAlpha <*> many parseAlphaNum
+    case t of
+        "int" -> return IntegerVar
+        "void" -> return Void
+        "double" -> return FloatingVar
+        "" -> empty
+        _ -> return $ UnknownType t
+
+parseTypedIdentifier :: Parser Value
+parseTypedIdentifier = Var <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+
 parseBinOp :: Parser BinaryOp
 parseBinOp = do
     test <- many parseWhiteSpace *> parseString ["+", "-", "**", "*", "/", "&", "|", "^", "%", ">>", "<<", "==", "!=", "<=", "<", ">=", ">", "="]

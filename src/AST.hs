@@ -20,12 +20,14 @@ data Type =
     Void |
     IntegerVar |
     FloatingVar |
+    UnknownType String |
     Function Type [Type]
 
 instance Show Type where
     show Void = "void"
     show IntegerVar = "int"
     show FloatingVar = "double"
+    show (UnknownType s) = s
     show (Function retVal args) = "function(" ++ dispList ", " args ++ "): " ++ show retVal
 
 
@@ -87,7 +89,7 @@ data Value =
     Nbr Int |
     RealNbr Double |
     GlobVar String |
-    Var Type String |
+    Var String Type |
     GlobCall String [Value] |
     Call FunctionPrototype [Value]
 
@@ -95,7 +97,7 @@ instance Show Value where
     show (Nbr n) = show n
     show (RealNbr n) = show n
     show (GlobVar n) = '@':n
-    show (Var t n) = n ++ ": " ++ show t
+    show (Var n t) = n ++ ": " ++ show t
     show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
 
