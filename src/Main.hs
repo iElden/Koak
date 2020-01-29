@@ -4,6 +4,7 @@
 import Data.Text.Lazy.IO as T
 
 import Parser
+import TypeInfer
 import Control.Applicative
 import Data.List
 import System.Environment
@@ -25,7 +26,10 @@ parseFiles (x:xs) = do
     f <- Prelude.readFile x
     case runParser parseFile f of
         Nothing -> Prelude.putStrLn $ x ++ ": Parsing error"
-        Just (v, _) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show v)) >> parseFiles xs
+        Just (v, _) ->
+            case inferTypes v of
+                (msgs, Nothing) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs))
+                (msgs, Just exprs) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs) ++ "\n" ++ (intercalate "\n" $ fmap show exprs)) >> parseFiles xs
 
 main :: IO ()
 main = do
