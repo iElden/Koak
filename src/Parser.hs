@@ -64,23 +64,92 @@ parseCharSequence :: String -> Parser String
 parseCharSequence "" = pure ""
 parseCharSequence (c:str) = (:) <$> parseChar [c] <*> parseCharSequence str
 
-parseInteger :: Parser Literal
+parseString :: [String] -> Parser String
+parseString [] = empty
+parseString (v:others) = parseCharSequence v <|> parseString others
+
+parseDigit :: Parser Char
+parseDigit = parseChar ['0'..'9']
+
+parseAlpha :: Parser Char
+parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
+
+parseAlphaNum :: Parser Char
+parseAlphaNum = parseDigit <|> parseAlpha
+
+parseWhiteSpace :: Parser Char
+parseWhiteSpace = parseChar " \t\n"
+
+parseInteger :: Parser Value
 parseInteger = do
-    intPart <- (readMaybe :: String -> Maybe Int) <$> (many $ parseChar ['0'..'9'])
+    intPart <- (readMaybe :: String -> Maybe Int) <$> many parseDigit
     maybe empty (pure . Nbr) intPart
 
-parseDouble :: Parser Literal
+parseDouble :: Parser Value
 parseDouble = do
     nbr <- (readMaybe :: String -> Maybe Double) <$> do
-        intPart <- many $ parseChar ['0'..'9']
+        intPart <- many parseDigit
         _ <- parseChar "."
-        decPart <- many $ parseChar ['0'..'9']
-        pure ("0" ++ intPart ++ "." ++ decPart ++ "0")
+        decPart <- many parseDigit
+        return $ "0" ++ intPart ++ "." ++ decPart ++ "0"
     maybe empty (pure . RealNbr) nbr
 
-parseLiteral :: Parser Literal
-parseLiteral = parseDouble <|> parseInteger
+parseIdentifier :: Parser Value
+parseIdentifier = GlobVar <$> ((:) <$> parseAlpha <*> many parseAlphaNum)
 
-parseIdentifier :: Parser String
-parseIdentifier =
-    (:) <$> (parseChar $ ['a'..'z'] ++ ['A'..'Z']) <*> (many $ parseChar $ ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
+parseType :: Parser Type
+parseType = do
+    t <- (:) <$> parseAlpha <*> many parseAlphaNum
+    case t of
+        "int" -> return IntegerVar
+        "void" -> return Void
+        "double" -> return FloatingVar
+        "" -> empty
+        _ -> return $ UnknownType t
+
+parseTypedIdentifier :: Parser Value
+parseTypedIdentifier = Var <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+
+parseBinOp :: Parser BinaryOp
+parseBinOp = do
+    test <- many parseWhiteSpace *> parseString ["+", "-", "**", "*", "/", "&", "|", "^", "%", ">>", "<<", "==", "!=", "<=", "<", ">=", ">", "="]
+    case test of
+        "+" -> return Add
+        "-" -> return Sub
+        "*" -> return Mul
+        "/" -> return Div
+        "&" -> return And
+        "|" -> return Or
+        "^" -> return Xor
+        "**" -> return Pow
+        "%" -> return Mod
+        ">>" -> return RSh
+        "<<" -> return LSh
+        "==" -> return Equ
+        "!=" -> return Neq
+        ">" -> return Gt
+        ">=" -> return Gte
+        "<" -> return Lt
+        "<=" -> return Lte
+        "=" -> return Asg
+
+parseUnOp :: Parser UnaryOp
+parseUnOp = do
+    test <- many parseWhiteSpace *> parseString ["+", "-", "!", "~"]
+    case test of
+        "+" -> return Plus
+        "-" -> return Minus
+        "!" -> return BoolNot
+        "~" -> return BinNot
+
+parseBinExpr :: Parser Expression
+parseBinExpr = Expr <$> (many parseWhiteSpace *> parseUnary <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
+
+parseExpression :: Parser Expression
+parseExpression = parseBinExpr <|> Un <$> parseUnary
+
+parseUnary :: Parser Unary
+parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
+
+parseLiteral :: Parser Value
+parseLiteral = parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
