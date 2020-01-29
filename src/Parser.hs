@@ -4,13 +4,24 @@ module Parser(
     parseChar,
     parseCharBlackList,
     parseCharSequence,
+    parseString,
+    parseDigit,
     parseInteger,
     parseDouble,
     parseLiteral,
     parseIdentifier,
+    parseTypedIdentifier,
     parseExpression,
     parseFile,
-    parseEOF
+    parseEOF,
+    parseType,
+    parseAlpha,
+    parseAlphaNum,
+    parseWhiteSpace,
+    parseBinOp,
+    parseUnOp,
+    parseBinExpr,
+    parseUnary,
 ) where
 
 import AST
@@ -92,6 +103,11 @@ parseInteger :: Parser Value
 parseInteger = do
     intPart <- (readMaybe :: String -> Maybe Int) <$> many parseDigit
     maybe empty (pure . Nbr) intPart
+
+--(.) :: (Value -> Parser Value) -> (Int -> Value) -> (Int -> Parser Value)
+--Nbr :: Int -> Value
+--pure :: Value -> Parser Value
+--maybe :: Parser Value -> (Int -> Parser Value) -> Maybe Int -> Parser Value
 
 parseDouble :: Parser Value
 parseDouble = do
