@@ -21,16 +21,16 @@ parseIdentifierTest = describe "parseIdentifierTest (UT)" $ do
     it "parse not identifier" $
         runParser parseIdentifier "0azeza" `shouldBe` Nothing
     it "parse identifier" $
-        runParser parseIdentifier "Add" `shouldBe` Just ("Add", [])
+        runParser parseIdentifier "Add" `shouldBe` Just (GlobVar "Add", [])
     it "parse identifier + rest" $
-        runParser parseIdentifier "A0tz3 76" `shouldBe` Just ("A0tz3", " 76")
+        runParser parseIdentifier "A0tz3 76" `shouldBe` Just (GlobVar "A0tz3", " 76")
     it "parse space + identifier" $
         runParser parseIdentifier " Adding" `shouldBe` Nothing
 
 parseLiteralTest :: Spec
 parseLiteralTest = describe "parseLiteralTest (FT)" $ do
     it "Not a number" $
-        runParser parseLiteral "oui" `shouldBe` Nothing
+        runParser parseLiteral "oui" `shouldBe` Just (GlobVar "oui", [])
     it "integer" $
         runParser parseLiteral "1" `shouldBe` Just (Nbr 1, [])
     it "Pattern : ." $

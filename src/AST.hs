@@ -21,7 +21,7 @@ data Type =
     IntegerVar |
     FloatingVar |
     UnknownType String |
-    Function Type [Type]
+    Function Type [Type] deriving Eq
 
 instance Show Type where
     show Void = "void"
@@ -49,7 +49,7 @@ data BinaryOp =
     Gte |
     Lt  |
     Lte |
-    Asg
+    Asg deriving Eq
 
 instance Show BinaryOp where
     show Add = "+"
@@ -75,7 +75,7 @@ data UnaryOp =
     BinNot  |
     BoolNot |
     Minus   |
-    Plus
+    Plus deriving Eq
 
 instance Show UnaryOp where
     show BinNot = "~"
@@ -90,7 +90,7 @@ data Value =
     GlobVar String |
     Var String Type |
     GlobCall String [Value] |
-    Call FunctionPrototype [Value]
+    Call FunctionPrototype [Value] deriving Eq
 
 instance Show Value where
     show (Nbr n) = show n
@@ -100,22 +100,21 @@ instance Show Value where
     show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
 
-
-data Unary = Unary [UnaryOp] Value
+data Unary = Unary [UnaryOp] Value deriving Eq
 
 instance Show Unary where
     show (Unary ops v) = dispList "" ops ++ show v
 
 
 data FunctionPrototype =
-    Proto String Type [(String, Type)]
+    Proto String Type [(String, Type)] deriving Eq
 
 instance Show FunctionPrototype where
     show (Proto name retType args) = name ++ "(" ++ (intercalate ", " $ fmap (\(name, t) -> name ++ ": " ++ show t) args) ++ "): " ++ show retType
 
 
 data FunctionDeclaration =
-    Decl FunctionPrototype [Expression]
+    Decl FunctionPrototype [Expression] deriving Eq
 
 instance Show FunctionDeclaration where
     show (Decl proto exprs) = show proto ++ " {\n" ++ dispList "\n" exprs ++ "}"
@@ -125,7 +124,7 @@ data Expression =
     ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
     Expr Unary BinaryOp Expression |
-    Un Unary
+    Un Unary deriving Eq
 
 instance Show Expression where
     show (Un unary) = show unary ++ ";"
