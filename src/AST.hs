@@ -127,7 +127,7 @@ data Expression =
     Un Unary deriving Eq
 
 instance Show Expression where
-    show (Un unary) = show unary ++ ";"
-    show (Expr unary op expr) = show unary ++ show op ++ show expr
+    show (Un unary) = show unary
+    show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
     show (Fct fct) = show fct
-    show (ExtFct fct) = "extern " ++ show fct ++ ";"
+    show (ExtFct fct) = "extern " ++ show fct

@@ -7,7 +7,10 @@ module Parser(
     parseInteger,
     parseDouble,
     parseLiteral,
-    parseIdentifier
+    parseIdentifier,
+    parseExpression,
+    parseFile,
+    parseEOF
 ) where
 
 import AST
@@ -70,6 +73,11 @@ parseString (v:others) = parseCharSequence v <|> parseString others
 
 parseDigit :: Parser Char
 parseDigit = parseChar ['0'..'9']
+
+parseEOF :: Parser ()
+parseEOF = Parse $ \s -> case s of
+    "" -> return ((), s)
+    _ -> Nothing
 
 parseAlpha :: Parser Char
 parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
@@ -153,3 +161,6 @@ parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseW
 
 parseLiteral :: Parser Value
 parseLiteral = parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
+
+parseFile :: Parser [Expression]
+parseFile = many parseWhiteSpace *> ((:) <$> parseExpression <*> many (some parseWhiteSpace *> parseExpression)) <* parseEOF
