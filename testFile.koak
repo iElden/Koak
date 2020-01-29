@@ -1,0 +1,5 @@
+test: int = 0
+test = test + 1
+test2: double
+test = test2: int - 5
+2 test
