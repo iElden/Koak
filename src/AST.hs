@@ -12,9 +12,9 @@ module AST (
 
 import Data.List
 
-
 dispList :: Show a => String -> [a] -> String
 dispList sep list = intercalate sep $ fmap show list
+
 
 data Type =
     Void |
