@@ -44,6 +44,7 @@ executable llvm-koak
 test-suite llvm-koak-test
   main-is:             Spec.hs
   other-modules:       ParserSpec
+                       ASTSpec
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   build-depends:       base >= 4.12 && <4.13,
