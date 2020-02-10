@@ -1,5 +1,14 @@
 module TypeInfer (
-    inferTypes
+    Message(..),
+    inferTypes,
+    notImplemented,
+    getExpr,
+    castError,
+    varNotFound,
+    noEffect,
+    isCastValid,
+    findVarType,
+    checkExpression,
     ) where
 
 import AST
@@ -7,7 +16,7 @@ import AST
 data Message =
     Info String |
     Warning String |
-    Error String
+    Error String deriving Eq
 
 instance Show Message where
     show (Info s) = "info: " ++ s

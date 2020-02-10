@@ -1,4 +1,5 @@
 import Test.Hspec
+import TypeInferSpec
 import ParserSpec
 import ASTSpec
 
@@ -6,6 +7,7 @@ main :: IO ()
 main = do
     astTests
     parsingTests
+    typeInferTests
 
 astTests :: IO ()
 astTests = hspec $ do
@@ -41,3 +43,13 @@ parsingTests = hspec $ do
     parseExpressionTest
     parseLiteralTest
     parseFileTest
+
+typeInferTests :: IO ()
+typeInferTests = hspec $ do
+    notImplementedTest
+    getExprTest
+    castErrorTest
+    varNotFoundTest
+    noEffectTest
+    isCastValidTest
+    findVarTypeTest
