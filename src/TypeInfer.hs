@@ -30,6 +30,8 @@ noEffect :: Expression -> [Message]
 noEffect e = [Warning "This statement has no effect", getExpr e]
 
 isCastValid :: Type -> Type -> Bool
+isCastValid IntegerVar FloatingVar = True
+isCastValid FloatingVar IntegerVar = True
 isCastValid _ _ = False
 
 findVarType :: [(String, Type)] -> String -> Maybe Type
@@ -48,8 +50,13 @@ checkExpression scope val@(Un (Unary ops (Var v t))) = case findVarType scope v 
         True -> (([], Just val), scope)
         False -> ((castError v t2 t val, Nothing), scope)
 
-checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = notImplemented scope
-checkExpression scope val@(Expr (Unary ops (Var v t)) Asg expr) = notImplemented scope
+checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
+    Nothing -> case checkExpression scope expr of
+        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Just val), newScope)
+    Just t -> checkExpression scope $ Expr (Unary ops $ Var v t) Asg expr
+checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpression ((v, t):scope) expr of
+    ((msgs, Just x), newScope) -> ((msgs, Just (Expr (Unary ops val) Asg x)), newScope)
+    v -> v
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) _ expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
