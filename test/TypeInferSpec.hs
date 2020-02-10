@@ -6,7 +6,8 @@ module TypeInferSpec (
         noEffectTest,
         isCastValidTest,
         findVarTypeTest,
-        --checkExpressionTest,
+        checkExpressionTestUnaries,
+        checkExpressionTestExpressions,
     ) where
 
 import TypeInfer
@@ -49,9 +50,9 @@ noEffectTest = describe "noEffectTest (UT)" $ do
 isCastValidTest :: Spec
 isCastValidTest = describe "isCastValidTest (UT)(NI)" $ do
     it "isCastValid int to float" $
-        isCastValid IntegerVar FloatingVar `shouldBe` False
+        isCastValid IntegerVar FloatingVar `shouldBe` True
     it "isCastValid float to int" $
-        isCastValid FloatingVar IntegerVar `shouldBe` False
+        isCastValid FloatingVar IntegerVar `shouldBe` True
     it "isCastValid void to int" $
         isCastValid Void IntegerVar `shouldBe` False
     it "isCastValid int to void" $
@@ -72,6 +73,32 @@ findVarTypeTest = describe "findVarTypeTest (UT)" $ do
         findVarType [("str", UnknownType "string"), ("i", IntegerVar), ("flt", FloatingVar), ("food", Void)] "zoon" `shouldBe`
         Nothing
 
---checkExpressionTest :: Spec
---checkExpressionTest = describe "checkExpressionTest (FT)" $ do
---    it "" $
+checkExpressionTestUnaries :: Spec
+checkExpressionTestUnaries = describe "checkExpressionTestUnaries (FT)" $ do
+    it "Un (Unary ops (GlobVar v)) with no scope" $
+        checkExpression [] (Un (Unary [] (GlobVar "var"))) `shouldBe`
+        (([Error "Use of undeclared identifier var", Info "In expression \'@var\'\n"], Nothing), [])
+    it "Un (Unary ops (GlobVar v)) with scope found" $
+        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Un (Unary [] (GlobVar "var"))) `shouldBe`
+        (([], Just $ Un $ Unary [] $ Var "var" IntegerVar), [("var", IntegerVar), ("vor", FloatingVar)])
+    it "Un (Unary ops (Var v t)) with no scope" $
+        checkExpression [] (Un $ Unary [] $ Var "var" IntegerVar) `shouldBe`
+        (([], Just (Un $ Unary [] $ Var "var" IntegerVar)), [("var", IntegerVar)])
+    it "Un (Unary ops (Var v t)) with scope and cast succeed" $
+        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Un $ Unary [] $ Var "var" FloatingVar) `shouldBe`
+        (([], Just (Un $ Unary [] $ Var "var" FloatingVar)), [("var", IntegerVar), ("vor", FloatingVar)])
+    it "Un (Unary ops (Var v t)) with scope and cast failed" $
+        checkExpression [("var", Void), ("vor", FloatingVar)] (Un $ Unary [] $ Var "var" FloatingVar) `shouldBe`
+        (([Error "Cannot cast variable var from double to void", Info "In expression \'var: double\'\n"], Nothing), [("var", Void), ("vor", FloatingVar)])
+checkExpressionTestExpressions :: Spec
+checkExpressionTestExpressions = describe "checkExpressionTestExpressions (FT)" $ do
+    it "Expr (Unary ops (GlobVar v)) Asg expr) where nothing" $
+        checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
+        (([Error "Use of undeclared identifier var", Info "In expression \'@var = 4\'\n"], Just $ Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4), [])
+    it "(var = vor = 4) with no scope for them" $
+        checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
+        (([Error "Use of undeclared identifier var", Info "In expression \'@var = vor = 4\'\n", Error "Use of undeclared identifier vor", Info "In expression \'@var = vor = 4\'\n"],
+        Just $ Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Un $ Unary [] $ Nbr 4), [])
+    it "var = 4 with scope for him" $
+        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
+        (([], Just (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4)), [("var", IntegerVar), ("var", IntegerVar), ("vor", FloatingVar)])

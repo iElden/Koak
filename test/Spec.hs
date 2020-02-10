@@ -53,3 +53,5 @@ typeInferTests = hspec $ do
     noEffectTest
     isCastValidTest
     findVarTypeTest
+    checkExpressionTestUnaries
+    checkExpressionTestExpressions
