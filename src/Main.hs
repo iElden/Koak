@@ -21,14 +21,22 @@ import LLVM.IRBuilder.Monad
 import LLVM.IRBuilder.Instruction
 
 parseFiles :: [String] -> IO()
-parseFiles [] = return ()
-parseFiles (x:xs) = do
+parseFiles [] = Prelude.putStrLn "fatal error: No input files"
+parseFiles [x] =  do
     f <- Prelude.readFile x
     case runParser parseFile f of
         Nothing -> Prelude.putStrLn $ x ++ ": Parsing error"
         Just (v, _) ->
             case inferTypes v of
                 (msgs, Nothing) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs))
+                (msgs, Just exprs) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs) ++ "\n" ++ (intercalate "\n" $ fmap show exprs))
+parseFiles (x:xs) = do
+    f <- Prelude.readFile x
+    case runParser parseFile f of
+        Nothing -> Prelude.putStrLn $ x ++ ": Parsing error"
+        Just (v, _) ->
+            case inferTypes v of
+                (msgs, Nothing) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs)) >> parseFiles xs
                 (msgs, Just exprs) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs) ++ "\n" ++ (intercalate "\n" $ fmap show exprs)) >> parseFiles xs
 
 main :: IO ()
