@@ -52,7 +52,7 @@ checkExpression scope val@(Un (Unary ops (Var v t))) = case findVarType scope v 
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
-        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Just val), newScope)
+        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
     Just t -> checkExpression scope $ Expr (Unary ops $ Var v t) Asg expr
 checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpression ((v, t):scope) expr of
     ((msgs, Just x), newScope) -> ((msgs, Just (Expr (Unary ops val) Asg x)), newScope)
@@ -60,7 +60,7 @@ checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpr
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) _ expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
-        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Just val), newScope)
+        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
     Just t -> case checkExpression scope expr of
         result@((_, Nothing), end) -> result
         ((msgs, _), newScope) -> ((msgs, Just val), newScope)
