@@ -3,7 +3,9 @@
 
 import Data.Text.Lazy.IO as T
 
+import AST
 import Parser
+import LLVMConverter
 import TypeInfer
 import Control.Applicative
 import Data.List
@@ -26,10 +28,16 @@ parseFiles [x] =  do
     f <- Prelude.readFile x
     case runParser parseFile f of
         Nothing -> Prelude.putStrLn $ x ++ ": Parsing error"
-        Just (v, _) ->
-            case inferTypes v of
-                (msgs, Nothing) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs))
-                (msgs, Just exprs) -> Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs) ++ "\n" ++ (intercalate "\n" $ fmap show exprs))
+        Just (v, _) -> displayTypeResult x $ inferTypes v
+    where
+        displayTypeResult :: String -> ([Message], Maybe [Expression]) -> IO ()
+        displayTypeResult x (msgs, Just exprs) = do
+            displayMsgs msgs
+            Prelude.putStrLn (intercalate "\n" $ fmap show exprs)
+            T.putStrLn $ ppllvm $ makeASTModule x exprs
+        displayTypeResult x (msgs, _) = displayMsgs msgs
+        displayMsgs :: [Message] -> IO ()
+        displayMsgs msgs = Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs))
 parseFiles (x:xs) = do
     parseFiles [x] >> parseFiles xs
 

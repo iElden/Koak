@@ -1,5 +1,6 @@
 module TypeInfer (
-    inferTypes
+    inferTypes,
+    Message
     ) where
 
 import AST
