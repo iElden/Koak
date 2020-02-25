@@ -25,11 +25,27 @@ import qualified LLVM.Module as Module
 import qualified LLVM.Target as Target
 
 convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
-convertValue (Nbr n) = CB.int32 $ fromIntegral n
+convertValue (Nbr n) = CB.double $ fromIntegral n
 convertValue (RealNbr n) = CB.double n
 
 convertExpression :: MonadModuleBuilder m => Expression -> IRBuilderT m Operand
 convertExpression (Un (Unary [] val)) = convertValue val
+convertExpression (Expr (Unary [] val) AST.Add expr) = do
+    leftOp <- convertValue val
+    rightOp <- convertExpression expr
+    fadd leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Sub expr) = do
+    leftOp <- convertValue val
+    rightOp <- convertExpression expr
+    fsub leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Mul expr) = do
+    leftOp <- convertValue val
+    rightOp <- convertExpression expr
+    fmul leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Div expr) = do
+    leftOp <- convertValue val
+    rightOp <- convertExpression expr
+    fdiv leftOp rightOp
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
