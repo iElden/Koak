@@ -27,6 +27,13 @@ import qualified LLVM.Target as Target
 convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
 convertValue (Nbr n) = CB.double $ fromIntegral n
 convertValue (RealNbr n) = CB.double n
+-- Variable
+convertValue (Var n FloatingVar) = do
+    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
+--convertValue (GlobVar n) = do
+--    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
+--convertValue (Var n IntegerVar) = LocalReference (IntegerType 32) $ fromString n
+
 
 convertExpression :: MonadModuleBuilder m => Expression -> IRBuilderT m Operand
 convertExpression (Un (Unary [] val)) = convertValue val
@@ -46,6 +53,10 @@ convertExpression (Expr (Unary [] val) AST.Div expr) = do
     leftOp <- convertValue val
     rightOp <- convertExpression expr
     fdiv leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Asg expr) = do
+    leftOp <- convertValue val
+    rightOp <- convertExpression expr
+    return $ rightOp
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
