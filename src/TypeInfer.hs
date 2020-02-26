@@ -60,12 +60,12 @@ checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpr
     v -> v
 checkExpression scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
-checkExpression scope val@(Expr (Unary ops (GlobVar v)) _ expr) = case findVarType scope v of
+checkExpression scope val@(Expr (Unary ops (GlobVar v)) op expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
     Just t -> case checkExpression scope expr of
         result@((_, Nothing), end) -> result
-        ((msgs, _), newScope) -> ((msgs, Just val), newScope)
+        ((msgs, _), newScope) -> ((msgs, Just $ Expr (Unary ops (Var v t)) op expr), newScope)
 checkExpression scope val@(Expr (Unary ops (Var v t)) _ expr) = case findVarType scope v of
     Nothing ->  case checkExpression scope expr of
         result@((_, Nothing), _) -> result
@@ -76,9 +76,9 @@ checkExpression scope val@(Expr (Unary ops (Var v t)) _ expr) = case findVarType
             ((msgs, _), newScope) -> ((msgs, Just val), newScope)
         False -> case checkExpression scope expr of
             ((msgs, _), newScope) -> (((castError v t2 t val) ++ msgs, Just val), newScope)
-checkExpression scope val@(Expr _ _ expr) = case checkExpression scope expr of
+checkExpression scope val@(Expr p1 op expr) = case checkExpression scope expr of
     result@((_, Nothing), _) -> result
-    ((msgs, _), newScope) -> ((msgs, Just val), newScope)
+    ((msgs, Just ex), newScope) -> ((msgs, Just (Expr p1 op ex)), newScope)
 
 checkExpression scope e = (([], Just e), scope)
 
