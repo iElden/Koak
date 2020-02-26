@@ -58,6 +58,7 @@ checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVar
 checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpression ((v, t):scope) expr of
     ((msgs, Just x), newScope) -> ((msgs, Just (Expr (Unary ops val) Asg x)), newScope)
     v -> v
+checkExpression scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) _ expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
