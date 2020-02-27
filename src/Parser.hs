@@ -153,8 +153,20 @@ parseUnOp = do
 parseBinExpr :: Parser Expression
 parseBinExpr = Expr <$> (many parseWhiteSpace *> parseUnary <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
 
+parseArgument :: Parser (String, Type)
+parseArgument = (,) <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+
+parseFunctionPrototype :: Parser FunctionPrototype
+parseFunctionPrototype = Proto <$> (((:) <$> parseAlpha <*> many parseAlphaNum) <* many parseWhiteSpace) <*> (parseChar "(" *> many parseWhiteSpace *> many (parseArgument <* many parseWhiteSpace) <* parseChar ")") <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+
+parseFunctionDeclaration :: Parser FunctionDeclaration
+parseFunctionDeclaration = Decl <$> (parseCharSequence "def" *> many parseWhiteSpace *> parseFunctionPrototype <* many parseWhiteSpace) <*> (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+
+parseFunction :: Parser Expression
+parseFunction = Fct <$> parseFunctionDeclaration
+
 parseExpression :: Parser Expression
-parseExpression = parseBinExpr <|> Un <$> parseUnary
+parseExpression = parseFunction <|> parseBinExpr <|> Un <$> parseUnary
 
 parseUnary :: Parser Unary
 parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
@@ -163,4 +175,4 @@ parseLiteral :: Parser Value
 parseLiteral = parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
 
 parseFile :: Parser [Expression]
-parseFile = many parseWhiteSpace *> ((:) <$> parseExpression <*> many (some parseWhiteSpace *> parseExpression)) <* parseEOF
+parseFile = many parseWhiteSpace *> ((:) <$> parseExpression <*> many (some parseWhiteSpace *> parseExpression)) <* many parseWhiteSpace <* parseEOF
