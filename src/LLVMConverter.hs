@@ -24,12 +24,19 @@ import qualified LLVM.Context as Ctx
 import qualified LLVM.Module as Module
 import qualified LLVM.Target as Target
 
+convertVariable :: MonadModuleBuilder m => Value -> Expression -> IRBuilderT m Operand
+convertVariable (Var n _) expr = do
+    res <- convertExpression expr
+    case res of
+        (ConstantOperand cons) -> global (fromString n) (FloatingPointType DoubleFP) cons
+        _ -> global (fromString n) (FloatingPointType DoubleFP) $ (C.Float $ F.Double 0.0)
+convertVariable _ expr = global (fromString n) (FloatingPointType DoubleFP) $ (C.Float $ F.Double 0.0)
+
 convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
 convertValue (Nbr n) = CB.double $ fromIntegral n
 convertValue (RealNbr n) = CB.double n
--- Variable
-convertValue (Var n FloatingVar) = do
-    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
+convertValue (Var n FloatingVar) = return $ ConstantOperand $ C.GlobalReference (FloatingPointType DoubleFP) (fromString n)
+convertValue (Var n IntegerVar) = return $ ConstantOperand $ C.GlobalReference (FloatingPointType DoubleFP) (fromString n)
 --convertValue (GlobVar n) = do
 --    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
 --convertValue (Var n IntegerVar) = LocalReference (IntegerType 32) $ fromString n
@@ -54,9 +61,7 @@ convertExpression (Expr (Unary [] val) AST.Div expr) = do
     rightOp <- convertExpression expr
     fdiv leftOp rightOp
 convertExpression (Expr (Unary [] val) AST.Asg expr) = do
-    leftOp <- convertValue val
-    rightOp <- convertExpression expr
-    return $ rightOp
+    convertVariable val expr
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
