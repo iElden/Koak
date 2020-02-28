@@ -22,6 +22,7 @@ data Type =
     FloatingVar |
     UnknownType String |
     Function Type [Type]
+    deriving Eq
 
 instance Show Type where
     show Void = "void"
