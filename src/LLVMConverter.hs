@@ -32,11 +32,20 @@ getParamsValueInLLVM list = sequence $ fmap (\s -> fmap (\f -> (f, [])) s) $ fma
 --getParamsValueInLLVM [] = return []
 --getParamsValueInLLVM (c:cs) = sequence ((convertValue c), []) ++ getParamsValueInLLVM cs
 
-getParamsTypeInLLVM :: [(String, AST.Type)] -> [ASTL.Type]
-getParamsTypeInLLVM [] = []
-getParamsTypeInLLVM ((_, FloatingVar):cs) = [floatType] ++ getParamsTypeInLLVM cs
-getParamsTypeInLLVM ((_, IntegerVar):cs) = [floatType] ++ getParamsTypeInLLVM cs
-getParamsTypeInLLVM (_:cs) = [floatType] ++ getParamsTypeInLLVM cs
+getFunctionParameters :: [(String, AST.Type)] -> [(ASTL.Type, String)]
+getFunctionParameters [] = []
+getFunctionParameters ((n, typ):cs) = [(getASTLType typ, n)] ++ getFunctionParameters cs
+
+getASTLType :: AST.Type -> ASTL.Type
+getASTLType FloatingVar = floatType
+getASTLType IntegerVar = floatType
+getASTLType _ = floatType
+
+convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> IRBuilderT m Operand
+convertFunction (Proto name args retType) exprs = do
+    function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \ops -> do
+         operands <- traverse convertExpression exprs
+         ret $ last operands
 
 convertVariable :: MonadModuleBuilder m => Value -> Expression -> IRBuilderT m Operand
 convertVariable (Var n _) expr = do
@@ -52,7 +61,7 @@ convertValue (Var n FloatingVar) = return $ ConstantOperand $ C.GlobalReference 
 convertValue (Var n IntegerVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
 convertValue (AST.Call (Proto name params retType) args) = do
     parameters <- getParamsValueInLLVM args
-    call (ConstantOperand $ C.GlobalReference (FunctionType floatType (getParamsTypeInLLVM params) False) $ fromString name) parameters
+    call (ConstantOperand $ C.GlobalReference (FunctionType floatType (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters
 --convertValue (GlobVar n) = do
 --    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
 --convertValue (Var n IntegerVar) = LocalReference (IntegerType 32) $ fromString n
@@ -60,6 +69,7 @@ convertValue (AST.Call (Proto name params retType) args) = do
 
 convertExpression :: MonadModuleBuilder m => Expression -> IRBuilderT m Operand
 convertExpression (Un (Unary [] val)) = convertValue val
+convertExpression (Fct (Decl proto expr)) = convertFunction proto expr
 convertExpression (Expr (Unary [] val) AST.Add expr) = do
     leftOp <- convertValue val
     rightOp <- convertExpression expr
