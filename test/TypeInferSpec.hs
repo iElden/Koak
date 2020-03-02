@@ -89,16 +89,16 @@ checkExpressionTestUnaries = describe "checkExpressionTestUnaries (FT)" $ do
         (([], Just (Un $ Unary [] $ Var "var" FloatingVar)), [("var", IntegerVar), ("vor", FloatingVar)])
     it "Un (Unary ops (Var v t)) with scope and cast failed" $
         checkExpression [("var", Void), ("vor", FloatingVar)] (Un $ Unary [] $ Var "var" FloatingVar) `shouldBe`
-        (([Error "Cannot cast variable var from double to void", Info "In expression \'var: double\'\n"], Nothing), [("var", Void), ("vor", FloatingVar)])
+        (([Error "Cannot cast variable var from void to double", Info "In expression \'var: double\'\n"], Nothing), [("var", Void), ("vor", FloatingVar)])
 checkExpressionTestExpressions :: Spec
 checkExpressionTestExpressions = describe "checkExpressionTestExpressions (FT)" $ do
     it "Expr (Unary ops (GlobVar v)) Asg expr) where nothing" $
         checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
-        (([Error "Use of undeclared identifier var", Info "In expression \'@var = 4\'\n"], Just $ Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4), [])
+        (([Error "Use of undeclared identifier var", Info "In expression \'@var = 4\'\n"], Nothing), [])
     it "(var = vor = 4) with no scope for them" $
         checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
-        (([Error "Use of undeclared identifier var", Info "In expression \'@var = vor = 4\'\n", Error "Use of undeclared identifier vor", Info "In expression \'@var = vor = 4\'\n"],
-        Just $ Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Un $ Unary [] $ Nbr 4), [])
+        (([Error "Use of undeclared identifier var", Info "In expression \'@var = @vor = 4\'\n", Error "Use of undeclared identifier vor", Info "In expression \'@vor = 4\'\n"],
+        Nothing), [])
     it "var = 4 with scope for him" $
         checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
-        (([], Just (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4)), [("var", IntegerVar), ("var", IntegerVar), ("vor", FloatingVar)])
+        (([], Just $ (Expr (Unary [] (Var "var" IntegerVar)) Asg (Un (Unary [] (Nbr 4))))), [("var", IntegerVar), ("var", IntegerVar), ("vor", FloatingVar)])
