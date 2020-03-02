@@ -51,6 +51,7 @@ data BinaryOp =
     Lt  |
     Lte |
     Asg
+    deriving Eq
 
 instance Show BinaryOp where
     show Add = "+"
@@ -78,6 +79,7 @@ data UnaryOp =
     BoolNot |
     Minus   |
     Plus
+    deriving Eq
 
 instance Show UnaryOp where
     show BinNot = "~"
@@ -93,6 +95,7 @@ data Value =
     Var String Type |
     GlobCall String [Expression] |
     Call FunctionPrototype [Expression]
+    deriving Eq
 
 instance Show Value where
     show (Nbr n) = show n
@@ -104,6 +107,7 @@ instance Show Value where
 
 
 data Unary = Unary [UnaryOp] Value
+    deriving Eq
 
 instance Show Unary where
     show (Unary ops v) = dispList "" ops ++ show v
@@ -119,19 +123,23 @@ instance Show FunctionPrototype where
 
 data FunctionDeclaration =
     Decl FunctionPrototype [Expression]
+    deriving Eq
 
 instance Show FunctionDeclaration where
     show (Decl proto exprs) = "def " ++ show proto ++ " {\n" ++ dispList "\n" exprs ++ "\n}"
 
 
 data Expression =
-    ExtFct Value |
+    ExtVar (String, Type) |
+    ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
     Expr Unary BinaryOp Expression |
     Un Unary
+    deriving Eq
 
 instance Show Expression where
     show (Un unary) = show unary
     show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
     show (Fct fct) = show fct
+    show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
     show (ExtFct val) = "extern " ++ show val
