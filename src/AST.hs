@@ -21,7 +21,7 @@ data Type =
     IntegerVar |
     FloatingVar |
     UnknownType String |
-    Function Type [Type]
+    Function FunctionPrototype
     deriving Eq
 
 instance Show Type where
@@ -29,7 +29,7 @@ instance Show Type where
     show IntegerVar = "int"
     show FloatingVar = "double"
     show (UnknownType s) = s
-    show (Function retVal args) = "function(" ++ dispList ", " args ++ "): " ++ show retVal
+    show (Function proto) = show proto
 
 
 data BinaryOp =
@@ -111,6 +111,7 @@ instance Show Unary where
 
 data FunctionPrototype =
     Proto String [(String, Type)] Type
+    deriving Eq
 
 instance Show FunctionPrototype where
     show (Proto name args retType) = name ++ "(" ++ (intercalate ", " $ fmap (\(name, t) -> name ++ ": " ++ show t) args) ++ "): " ++ show retType
