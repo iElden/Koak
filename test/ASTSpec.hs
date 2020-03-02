@@ -13,6 +13,9 @@ module ASTSpec (
 import AST
 import Test.Hspec
 
+toExpr :: Value -> Expression
+toExpr value = Un $ Unary [] value
+
 dispListTest :: Spec
 dispListTest = describe "dispListTest (UT)" $ do
     it "no sep and list" $
@@ -23,9 +26,6 @@ dispListTest = describe "dispListTest (UT)" $ do
         dispList [] [Nbr 3, RealNbr 2.0, GlobVar "t"] `shouldBe` "32.0@t"
     it "sep and list" $
         dispList ", " [Nbr 3, RealNbr 2.0, GlobVar "t"] `shouldBe` "3, 2.0, @t"
-    it "sep and list 2" $
-        dispList " -> " [(Function IntegerVar [Void, FloatingVar]), (UnknownType "string")]
-        `shouldBe` "function(void, double): int -> string"
 
 typeTest :: Spec
 typeTest = describe "typeTest (UT)" $ do
@@ -40,13 +40,10 @@ typeTest = describe "typeTest (UT)" $ do
     it "Unknown Type with existing type" $
         show (UnknownType "string") `shouldBe` "string"
     it "Function Type Nothing" $
-        show (Function IntegerVar []) `shouldBe` "function(): int"
+        show (Function $ Proto "function" [] IntegerVar) `shouldBe` "function(): int"
     it "Function Type Something" $
-        show (Function IntegerVar [IntegerVar, FloatingVar, Void]) `shouldBe`
-        "function(int, double, void): int"
-    it "Function Function Functions" $
-        show (Function (Function IntegerVar [IntegerVar, FloatingVar]) [Function Void [Void, Void], FloatingVar])
-        `shouldBe` "function(function(void, void): void, double): function(int, double): int"
+        show (Function $ Proto "function" [("", IntegerVar), ("", FloatingVar), ("", Void)] IntegerVar) `shouldBe`
+        "function(: int, : double, : void): int"
 
 binaryOpTest :: Spec
 binaryOpTest = describe "binaryOpTest (UT)" $ do
@@ -111,11 +108,11 @@ valueTest = describe "valueTest (UT)" $ do
     it "show globcall" $
         show (GlobCall "fun" []) `shouldBe` "@fun()"
     it "show globcall with args" $
-        show (GlobCall "t" [Nbr 4, RealNbr 3.2, GlobVar "u"]) `shouldBe` "@t(4, 3.2, @u)"
+        show (GlobCall "t" [toExpr $ Nbr 4, toExpr $ RealNbr 3.2, toExpr $ GlobVar "u"]) `shouldBe` "@t(4, 3.2, @u)"
     it "show call" $
-        show (Call (Proto "func" Void []) []) `shouldBe` "func()"
+        show (Call (Proto "func" [] Void) []) `shouldBe` "func()"
     it "show call with args" $
-        show (Call (Proto "func" IntegerVar []) [(Nbr 3), RealNbr 2.54, Var "tru" IntegerVar]) `shouldBe`
+        show (Call (Proto "func" [] IntegerVar) [toExpr $ Nbr 3, toExpr $ RealNbr 2.54, toExpr $ Var "tru" IntegerVar]) `shouldBe`
         "func(3, 2.54, tru: int)"
 
 unaryTest :: Spec
@@ -128,18 +125,18 @@ unaryTest = describe "unaryTest (UT)" $ do
 functionPrototypeTest :: Spec
 functionPrototypeTest = describe "functionPrototypeTest (UT)" $ do
     it "show func proto void" $
-        show (Proto "func" Void []) `shouldBe` "func(): void"
+        show (Proto "func" [] Void) `shouldBe` "func(): void"
     it "show func proto one arg" $
-        show (Proto "one" IntegerVar [("itgr", IntegerVar)]) `shouldBe` "one(itgr: int): int"
+        show (Proto "one" [("itgr", IntegerVar)] IntegerVar) `shouldBe` "one(itgr: int): int"
     it "show func multiple args" $
-        show (Proto "multiple" FloatingVar [("itgr", IntegerVar), ("vd", Void), ("flt", FloatingVar)]) `shouldBe` "multiple(itgr: int, vd: void, flt: double): double"
+        show (Proto "multiple" [("itgr", IntegerVar), ("vd", Void), ("flt", FloatingVar)] FloatingVar) `shouldBe` "multiple(itgr: int, vd: void, flt: double): double"
 
 functionDeclarationTest :: Spec
 functionDeclarationTest = describe "funcitonDeclarationTest (UT)" $ do
     it "show fct" $
-        show (Decl (Proto "func" FloatingVar [("a", IntegerVar), ("b", FloatingVar)])
+        show (Decl (Proto "func" [("a", IntegerVar), ("b", FloatingVar)] FloatingVar)
         [(Expr (Unary [Minus] (Var "a" IntegerVar)) Sub (Un (Unary [] (Var "b" FloatingVar))))])
-        `shouldBe` "func(a: int, b: double): double {\n-a: int - b: double}"
+        `shouldBe` "def func(a: int, b: double): double {\n-a: int - b: double\n}"
 
 expressionShowTest :: Spec
 expressionShowTest = describe "ExpressionShowTest (UT)" $ do
@@ -149,7 +146,7 @@ expressionShowTest = describe "ExpressionShowTest (UT)" $ do
         show (Expr (Unary [] (Nbr 4)) Add (Un (Unary [Minus] (RealNbr (5.0))))) `shouldBe`
         "4 + -5.0"
     it "show fct" $
-        show (Fct (Decl (Proto "Func" IntegerVar [("tr", IntegerVar)]) [])) `shouldBe`
-        "Func(tr: int): int {\n}"
-    it "show ExtFct" $
-        show (ExtFct (Proto "Func" Void [])) `shouldBe` "extern Func(): void"
+        show (Fct (Decl (Proto "Func" [("tr", IntegerVar)] IntegerVar) [])) `shouldBe`
+        "def Func(tr: int): int {\n\n}"
+--    it "show ExtFct" $
+--        show (ExtFct (Proto "Func" [] Void)) `shouldBe` "extern Func(): void"

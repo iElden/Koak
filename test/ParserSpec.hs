@@ -23,6 +23,7 @@ module ParserSpec
     ) where
 
 import Test.Hspec
+import TypeInfer
 import Parser
 import AST
 
