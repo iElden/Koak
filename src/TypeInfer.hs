@@ -10,12 +10,14 @@ data Message =
     Warning String |
     Error String
 
+type Scope = [(String, Value)]
+
 instance Show Message where
     show (Info s) = "info: " ++ s
     show (Warning s) = "warning: " ++ s
     show (Error s) = "fatal error: " ++ s
 
-notImplemented :: [(String, Type)] -> (([Message], Maybe Expression), [(String, Type)])
+notImplemented :: Scope -> (([Message], Maybe Expression), Scope)
 notImplemented scope = (([Error "Not implemented"], Nothing), scope)
 
 getExpr :: Expression -> Message
@@ -35,46 +37,48 @@ isCastValid IntegerVar FloatingVar = True
 isCastValid FloatingVar IntegerVar = True
 isCastValid _ _ = False
 
-findVarType :: [(String, Type)] -> String -> Maybe Type
+findVarType :: Scope -> String -> Maybe Value
 findVarType [] _ = Nothing
-findVarType ((varName, varType):scope) name
-    | name == varName = return varType
+findVarType ((varName, var):scope) name
+    | name == varName = return var
     | otherwise = findVarType scope name
 
-checkExpression :: [(String, Type)] -> Expression -> (([Message], Maybe Expression), [(String, Type)])
+checkExpression :: Scope -> Expression -> (([Message], Maybe Expression), Scope)
 checkExpression scope val@(Un (Unary ops (GlobVar v))) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
-    Just t -> (([], Just $ Un $ Unary ops $ Var v t), scope)
-checkExpression scope val@(Un (Unary ops (Var v t))) = case findVarType scope v of
-    Nothing -> (([], Just val), (v, t):scope)
-    Just t2 -> case isCastValid t2 t of
-        True -> (([], Just val), scope)
-        False -> ((castError v t2 t val, Nothing), scope)
+    Just t -> (([], Just $ Un $ Unary ops t), scope)
+checkExpression scope val@(Un (Unary ops var@(Var _ v _))) = case findVarType scope v of
+    Nothing -> (([], Just val), (v, var):scope)
+    Just t2 -> (([
+        Error $ "Variable " ++ v ++ " was previously defined",
+        Info $ "-> " ++ show t2,
+        getExpr val
+        ], Nothing), scope)
 checkExpression scope val@(Un (Unary ops (GlobCall v args))) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
-    Just (Function proto@(Proto _ argsType _)) -> case length argsType == length args of
+    Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
         True -> case inferTypes scope args of
             (msgs, Nothing) -> ((msgs, Nothing), scope)
             (msgs, Just va) -> ((msgs, Just $ Un $ (Unary ops $ Call proto va)), scope)
         False -> (([Error $ "Not enough arguments for function " ++ show proto, getExpr val], Nothing), scope)
-    Just t -> (([Error $ "Cannot call " ++ v ++ ": " ++ show t, getExpr val], Nothing), scope)
+    Just t -> (([Error $ "Cannot call " ++ show t, getExpr val], Nothing), scope)
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
-    Just t -> checkExpression scope $ Expr (Unary ops $ Var v t) Asg expr
-checkExpression scope (Expr (Unary ops val@(Var v t)) Asg expr) = case checkExpression ((v, t):scope) expr of
+    Just t -> checkExpression scope $ Expr (Unary ops t) Asg expr
+checkExpression scope (Expr (Unary ops val@(Var _ v t)) Asg expr) = case checkExpression ((v, val):scope) expr of
     ((msgs, Just x), newScope) -> ((msgs, Just (Expr (Unary ops val) Asg x)), newScope)
-    v -> v
+    va -> va
 checkExpression scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
 checkExpression scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
     Nothing ->
         case filter ((/=) Nothing) $ fmap (\(s, t) -> findVarType scope s) args of
-            [] -> case inferTypes (scope ++ args) exprs of
-                (msgs, Nothing) -> ((msgs, Nothing), (name, Function proto):scope)
-                (msgs, Just exs) -> ((msgs, Just (Fct (Decl proto exs))), (name, Function proto):scope)
-            arr -> (([Error "Shadow is prohibited", Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), (name, Function proto):scope)
+            [] -> case inferTypes (scope ++ fmap (\(n, vt) -> (n, Var Local n vt)) args) exprs of
+                (msgs, Nothing) -> ((msgs, Nothing), (name, Var Global name $ Function proto):scope)
+                (msgs, Just exs) -> ((msgs, Just (Fct (Decl proto exs))), (name, Var Global name $ Function proto):scope)
+            arr -> (([Error "Shadow is prohibited", Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), (name, Var Global name $ Function proto):scope)
     Just t -> (([Error $ "Variable " ++ name ++ " already defined with type " ++ show t, Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), scope)
 
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) op expr) = case findVarType scope v of
@@ -82,21 +86,20 @@ checkExpression scope val@(Expr (Unary ops (GlobVar v)) op expr) = case findVarT
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
     Just t -> case checkExpression scope expr of
         result@((_, Nothing), end) -> result
-        ((msgs, Just ex), newScope) -> ((msgs, Just $ Expr (Unary ops (Var v t)) op ex), newScope)
-checkExpression scope val@(Expr un@(Unary ops (Var v t)) op expr) = case findVarType scope v of
+        ((msgs, Just ex), newScope) -> ((msgs, Just $ Expr (Unary ops t) op ex), newScope)
+checkExpression scope val@(Expr un@(Unary ops (Var _ v t)) op expr) = case findVarType scope v of
     Nothing ->  case checkExpression scope expr of
         result@((_, Nothing), _) -> result
         ((msgs, Just ex), newScope) -> ((msgs, Just (Expr un op ex)), newScope)
-    Just t2 -> case isCastValid t2 t of
-        True -> case checkExpression scope expr of
-            result@((_, Nothing), _) -> result
-            ((msgs, Just ex), newScope) -> ((msgs, Just (Expr un op ex)), newScope)
-        False -> case checkExpression scope expr of
-            ((msgs, Just ex), newScope) -> (((castError v t2 t val) ++ msgs, Just ex), newScope)
+    Just t2 -> (([
+        Error $ "Variable " ++ v ++ " was previously defined",
+        Info $ "-> " ++ show t2,
+        getExpr val
+        ], Nothing), scope)
 checkExpression scope val@(Expr (Unary ops (GlobCall v args)) op expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
-    Just (Function proto@(Proto _ argsType _)) -> case length argsType == length args of
+    Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
         True -> case inferTypes scope args of
             (msgs, Nothing) -> ((msgs, Nothing), scope)
             (msgs, Just ex) -> case checkExpression scope $ Expr (Unary ops $ Call proto ex) op expr of
@@ -110,11 +113,11 @@ checkExpression scope val@(Expr p1 op expr) = case checkExpression scope expr of
 
 checkExpression scope e = (([], Just e), scope)
 
-checkExpressions :: [(String, Type)] -> [Expression] -> [([Message], Maybe Expression)]
+checkExpressions :: Scope -> [Expression] -> [([Message], Maybe Expression)]
 checkExpressions _ [] = []
 checkExpressions scope (x:xs) = case checkExpression scope x of
     (val, newScope) -> val:(checkExpressions newScope xs)
 
-inferTypes :: [(String, Type)] -> [Expression] -> ([Message], Maybe [Expression])
+inferTypes :: Scope -> [Expression] -> ([Message], Maybe [Expression])
 inferTypes _ [] = ([Warning "Empty file given"], Just [])
 inferTypes scope exprs = fmap (sequence . reverse) $ foldl (\(a, b) (c, d) -> (a ++ c, d:b)) ([], []) $ checkExpressions scope exprs

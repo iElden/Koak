@@ -7,6 +7,7 @@ module AST (
     FunctionPrototype (..),
     FunctionDeclaration (..),
     Expression (..),
+    VarScope (..)
     ) where
 
 
@@ -88,11 +89,20 @@ instance Show UnaryOp where
     show Plus = "+"
 
 
+data VarScope =
+    Local |
+    Global
+    deriving Eq
+
+instance Show VarScope where
+    show Global = "global"
+    show Local  = "local"
+
 data Value =
     Nbr Int |
     RealNbr Double |
     GlobVar String |
-    Var String Type |
+    Var VarScope String Type |
     GlobCall String [Expression] |
     Call FunctionPrototype [Expression]
     deriving Eq
@@ -101,7 +111,7 @@ instance Show Value where
     show (Nbr n) = show n
     show (RealNbr n) = show n
     show (GlobVar n) = '@':n
-    show (Var n t) = n ++ ": " ++ show t
+    show (Var scope n t) = show scope ++ " " ++ n ++ ": " ++ show t
     show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
 
