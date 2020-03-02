@@ -7,6 +7,7 @@ module AST (
     FunctionPrototype (..),
     FunctionDeclaration (..),
     Expression (..),
+    dispList
     ) where
 
 

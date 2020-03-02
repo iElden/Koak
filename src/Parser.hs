@@ -10,7 +10,18 @@ module Parser(
     parseIdentifier,
     parseExpression,
     parseFile,
-    parseEOF
+    parseEOF,
+    parseString,
+    parseDigit,
+    parseAlpha,
+    parseAlphaNum,
+    parseWhiteSpace,
+    parseType,
+    parseTypedIdentifier,
+    parseBinOp,
+    parseUnary,
+    parseUnOp,
+    parseBinExpr
 ) where
 
 import AST
