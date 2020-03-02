@@ -48,7 +48,7 @@ convertFunction (Proto name args retType) exprs = do
          ret $ last operands
 
 convertVariable :: MonadModuleBuilder m => Value -> Expression -> IRBuilderT m Operand
-convertVariable (Var n _) expr = do
+convertVariable (Var _ n _) expr = do
     res <- convertExpression expr
     case res of
         (ConstantOperand cons) -> global (fromString n) floatType cons
@@ -57,8 +57,8 @@ convertVariable (Var n _) expr = do
 convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
 convertValue (Nbr n) = CB.double $ fromIntegral n
 convertValue (RealNbr n) = CB.double n
-convertValue (Var n FloatingVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
-convertValue (Var n IntegerVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
+convertValue (Var _ n FloatingVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
+convertValue (Var _ n IntegerVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
 convertValue (AST.Call (Proto name params retType) args) = do
     parameters <- getParamsValueInLLVM args
     call (ConstantOperand $ C.GlobalReference (FunctionType floatType (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters

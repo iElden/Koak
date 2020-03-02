@@ -126,8 +126,15 @@ parseType = do
         "" -> empty
         _ -> return $ UnknownType t
 
+parseScopeIdentifier :: Parser VarScope
+parseScopeIdentifier = do
+    result <- parseString ["global", "local"]
+    case result of
+        "global" -> return Global
+        "local" -> return Local
+
 parseTypedIdentifier :: Parser Value
-parseTypedIdentifier = Var <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+parseTypedIdentifier = Var <$> parseScopeIdentifier <*> (many parseWhiteSpace *> ((:) <$> parseAlpha <*> many parseAlphaNum)) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
 
 parseBinOp :: Parser BinaryOp
 parseBinOp = do
