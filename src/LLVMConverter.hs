@@ -25,6 +25,8 @@ import qualified LLVM.Context as Ctx
 import qualified LLVM.Module as Module
 import qualified LLVM.Target as Target
 
+type LocalVariables = [(ASTL.Type, String, Maybe Operand)]
+
 floatType = FloatingPointType DoubleFP
 
 getParamsValueInLLVM :: MonadModuleBuilder m => [Expression] -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
@@ -58,6 +60,7 @@ convertVariable (Var Local n _) expr = do
     case res of
         (ConstantOperand cons) -> global (fromString n) floatType cons
         _ -> global (fromString n) floatType $ (C.Float $ F.Double 0.0)
+
 
 convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
 convertValue (Nbr n) = CB.double $ fromIntegral n

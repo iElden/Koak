@@ -1,5 +1,6 @@
 def test(var1: int var2: double): double {
-    var1 + var2 + 1
+    a : double = var1 + var2 + 1
+    2 + a
 }
 
 test(1 + 1 1)
