@@ -48,7 +48,12 @@ convertFunction (Proto name args retType) exprs = do
          ret $ last operands
 
 convertVariable :: MonadModuleBuilder m => Value -> Expression -> IRBuilderT m Operand
-convertVariable (Var _ n _) expr = do
+convertVariable (Var Global n _) expr = do
+    res <- convertExpression expr
+    case res of
+        (ConstantOperand cons) -> global (fromString n) floatType cons
+        _ -> global (fromString n) floatType $ (C.Float $ F.Double 0.0)
+convertVariable (Var Local n _) expr = do
     res <- convertExpression expr
     case res of
         (ConstantOperand cons) -> global (fromString n) floatType cons
