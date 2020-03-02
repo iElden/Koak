@@ -111,18 +111,18 @@ data FunctionPrototype =
     Proto String Type [(String, Type)] deriving Eq
 
 instance Show FunctionPrototype where
-    show (Proto name retType args) = name ++ "(" ++ (intercalate ", " $ fmap (\(name, t) -> name ++ ": " ++ show t) args) ++ "): " ++ show retType
+    show (Proto name args retType) = name ++ "(" ++ (intercalate ", " $ fmap (\(name, t) -> name ++ ": " ++ show t) args) ++ "): " ++ show retType
 
 
 data FunctionDeclaration =
     Decl FunctionPrototype [Expression] deriving Eq
 
 instance Show FunctionDeclaration where
-    show (Decl proto exprs) = show proto ++ " {\n" ++ dispList "\n" exprs ++ "}"
+    show (Decl proto exprs) = "def " ++ show proto ++ " {\n" ++ dispList "\n" exprs ++ "\n}"
 
 
 data Expression =
-    ExtFct FunctionPrototype |
+    ExtFct Value |
     Fct FunctionDeclaration |
     Expr Unary BinaryOp Expression |
     Un Unary deriving Eq
@@ -131,4 +131,4 @@ instance Show Expression where
     show (Un unary) = show unary
     show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
     show (Fct fct) = show fct
-    show (ExtFct fct) = "extern " ++ show fct
+    show (ExtFct val) = "extern " ++ show val
