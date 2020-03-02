@@ -91,8 +91,8 @@ data Value =
     RealNbr Double |
     GlobVar String |
     Var String Type |
-    GlobCall String [Value] |
-    Call FunctionPrototype [Value]
+    GlobCall String [Expression] |
+    Call FunctionPrototype [Expression]
 
 instance Show Value where
     show (Nbr n) = show n

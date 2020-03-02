@@ -27,8 +27,8 @@ import qualified LLVM.Target as Target
 
 floatType = FloatingPointType DoubleFP
 
-getParamsValueInLLVM :: MonadModuleBuilder m => [Value] -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
-getParamsValueInLLVM list = sequence $ fmap (\s -> fmap (\f -> (f, [])) s) $ fmap convertValue list
+getParamsValueInLLVM :: MonadModuleBuilder m => [Expression] -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
+getParamsValueInLLVM list = sequence $ fmap (\s -> fmap (\f -> (f, [])) s) $ fmap convertExpression list
 --getParamsValueInLLVM [] = return []
 --getParamsValueInLLVM (c:cs) = sequence ((convertValue c), []) ++ getParamsValueInLLVM cs
 
