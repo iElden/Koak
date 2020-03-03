@@ -130,6 +130,11 @@ functionPrototypeTest = describe "functionPrototypeTest (UT)" $ do
         show (Proto "one" [("itgr", IntegerVar)] IntegerVar) `shouldBe` "one(itgr: int): int"
     it "show func multiple args" $
         show (Proto "multiple" [("itgr", IntegerVar), ("vd", Void), ("flt", FloatingVar)] FloatingVar) `shouldBe` "multiple(itgr: int, vd: void, flt: double): double"
+    it "show func proto ex fibo" $
+        show (Proto "fibo" [("n1", IntegerVar), ("n2", IntegerVar)] IntegerVar) `shouldBe` "fibo(n1: int, n2: int): int"
+    it "show func proto ex cancer" $
+        show (Proto "my_cancer_func" [("a", Void), ("b", IntegerVar), ("c", FloatingVar), ("d", UnknownType "string"), ("e", UnknownType "nom_du_projet_t")] (UnknownType "cancer_func_return_type")) `shouldBe`
+        "my_cancer_func(a: void, b: int, c: double, d: string, e: nom_du_projet_t): cancer_func_return_type"
 
 functionDeclarationTest :: Spec
 functionDeclarationTest = describe "funcitonDeclarationTest (UT)" $ do
