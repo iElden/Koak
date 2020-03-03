@@ -17,3 +17,8 @@ fclean:
 	rm -rf dist-newstyle/build/ dist-newstyle/cache/
 
 re:	fclean all
+
+test:
+	nix-shell --run "cabal test"
+
+.PHONY: test
