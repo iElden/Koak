@@ -25,14 +25,28 @@ import qualified LLVM.Context as Ctx
 import qualified LLVM.Module as Module
 import qualified LLVM.Target as Target
 
-type LocalVariables = [(ASTL.Type, String, Maybe Operand)]
-
 floatType = FloatingPointType DoubleFP
 
-getParamsValueInLLVM :: MonadModuleBuilder m => [Expression] -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
-getParamsValueInLLVM list = sequence $ fmap (\s -> fmap (\f -> (f, [])) s) $ fmap convertExpression list
+-- lookups in variable
+type VarName = String
+type LocalVariables = [(ASTL.Type, VarName, Maybe Operand)]
+
+lookupVariable :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m Operand
+lookupVariable n [] = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
+lookupVariable n ((t, name, op):xs)
+    | n == name = case op of
+        Just operand -> return operand
+        Nothing -> return $ LocalReference t (fromString n)
+    | otherwise = lookupVariable n xs
+
+
+getParamsValueInLLVM :: MonadModuleBuilder m => [Expression] -> LocalVariables -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
+getParamsValueInLLVM list vars = sequence $ fmap (\s -> fmap (\f -> (fst f, [])) s) $ fmap (\t -> convertExpression t vars) list
 --getParamsValueInLLVM [] = return []
 --getParamsValueInLLVM (c:cs) = sequence ((convertValue c), []) ++ getParamsValueInLLVM cs
+
+putFPinLocalVariables :: LocalVariables -> ([ASTL.Type], [String]) -> LocalVariables
+putFPinLocalVariables vars (types, names) = zip3 types names $ replicate (length names) Nothing
 
 getFunctionParameters :: [(String, AST.Type)] -> [(ASTL.Type, String)]
 getFunctionParameters [] = []
@@ -43,66 +57,95 @@ getASTLType FloatingVar = floatType
 getASTLType IntegerVar = floatType
 getASTLType _ = floatType
 
+--convertNewExpression :: MonadModuleBuilder m => [Expression] -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
+--convertNewExpression (x:[]) vars = convertExpression x vars
+--convertNewExpression (x:xs) vars = do
+--    ops <- convertExpression x vars
+--    convertNewExpression xs $ snd ops
+
 convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs = do
-    function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \ops -> do
-         operands <- traverse convertExpression exprs
-         ret $ last operands
+    function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
+        operand <- convert (putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs -- Update le tableau de vars pour qu'il soit envoyé dans convert Expression
+        ret operand
+            where
+                convert :: MonadModuleBuilder m => LocalVariables -> [Expression] -> IRBuilderT m Operand
+                convert _ [] = CB.int32 0
+                convert scope (x:[]) = do
+                    (op, _) <- convertExpression x scope
+                    return op
+                convert scope (x:xs) = do
+                    (op, vars) <- convertExpression x scope
+                    convert vars xs
 
-convertVariable :: MonadModuleBuilder m => Value -> Expression -> IRBuilderT m Operand
-convertVariable (Var Global n _) expr = do
-    res <- convertExpression expr
+
+
+convertVariable :: MonadModuleBuilder m => Value -> Expression -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
+convertVariable (Var Global n t) expr vars = do
+    (res, _) <- convertExpression expr vars
     case res of
-        (ConstantOperand cons) -> global (fromString n) floatType cons
-        _ -> global (fromString n) floatType $ (C.Float $ F.Double 0.0)
-convertVariable (Var Local n _) expr = do
-    res <- convertExpression expr
+        (ConstantOperand cons) -> fmap (\s -> (s, vars)) $ global (fromString n) floatType cons
+        _ -> fmap (\s -> (s, vars)) $ global (fromString n) floatType $ (C.Float $ F.Double 0.0)
+convertVariable (Var Local n t) expr vars = do
+    (res, _) <- convertExpression expr vars
     case res of
-        (ConstantOperand cons) -> global (fromString n) floatType cons
-        _ -> global (fromString n) floatType $ (C.Float $ F.Double 0.0)
+        op -> return (op, [(getASTLType t, n, Just op)] ++ vars)
+        _ -> fmap (\s -> (s, vars)) $ global (fromString n) floatType $ (C.Float $ F.Double 0.0)
 
 
-convertValue :: MonadModuleBuilder m => Value -> IRBuilderT m Operand
-convertValue (Nbr n) = CB.double $ fromIntegral n
-convertValue (RealNbr n) = CB.double n
-convertValue (Var _ n FloatingVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
-convertValue (Var _ n IntegerVar) = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
-convertValue (AST.Call (Proto name params retType) args) = do
-    parameters <- getParamsValueInLLVM args
+convertValue :: MonadModuleBuilder m => Value -> LocalVariables -> IRBuilderT m Operand
+convertValue (Nbr n) _ = CB.double $ fromIntegral n
+convertValue (RealNbr n) _ = CB.double n
+convertValue (Var _ n FloatingVar) vars = lookupVariable n vars
+convertValue (Var _ n IntegerVar) vars = lookupVariable n vars
+convertValue (AST.Call (Proto name params retType) args) vars = do
+    parameters <- getParamsValueInLLVM args vars
     call (ConstantOperand $ C.GlobalReference (FunctionType floatType (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters
 --convertValue (GlobVar n) = do
 --    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
 --convertValue (Var n IntegerVar) = LocalReference (IntegerType 32) $ fromString n
 
 
-convertExpression :: MonadModuleBuilder m => Expression -> IRBuilderT m Operand
-convertExpression (Un (Unary [] val)) = convertValue val
-convertExpression (Fct (Decl proto expr)) = convertFunction proto expr
-convertExpression (Expr (Unary [] val) AST.Add expr) = do
-    leftOp <- convertValue val
-    rightOp <- convertExpression expr
-    fadd leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Sub expr) = do
-    leftOp <- convertValue val
-    rightOp <- convertExpression expr
-    fsub leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Mul expr) = do
-    leftOp <- convertValue val
-    rightOp <- convertExpression expr
-    fmul leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Div expr) = do
-    leftOp <- convertValue val
-    rightOp <- convertExpression expr
-    fdiv leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Asg expr) = do
-    convertVariable val expr
+convertExpression :: MonadModuleBuilder m => Expression -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
+convertExpression (Un (Unary [] val)) vars = do
+    op <- convertValue val vars
+    return $ (op, vars)
+convertExpression (Fct (Decl proto expr)) vars = do
+    op <- convertFunction proto expr
+    return $ (op, vars)
+convertExpression (Expr (Unary [] val) AST.Add expr) vars = do
+    leftOp <- convertValue val vars
+    (rightOp, locs) <- convertExpression expr vars
+    fmap (\s -> (s, locs)) $ fadd leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Sub expr) vars = do
+    leftOp <- convertValue val vars
+    (rightOp, locs) <- convertExpression expr vars
+    fmap (\s -> (s, locs)) $ fsub leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Mul expr) vars = do
+    leftOp <- convertValue val vars
+    (rightOp, locs) <- convertExpression expr vars
+    fmap (\s -> (s, locs)) $ fmul leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Div expr) vars = do
+    leftOp <- convertValue val vars
+    (rightOp, locs) <- convertExpression expr vars
+    fmap (\s -> (s, locs)) $ fdiv leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
-  function "main" [] double $ \_ -> do
-    value <- CB.int32 $ 0
-    ret $ value
+    function "main" [] double $ \_ -> do
+        value <- CB.int32 $ 0
+        ret $ value
 makeASTModule name exprs = buildModule (fromString name) $ do
-  function "main" [] double $ \_ -> do
-    operands <- traverse convertExpression exprs
-    ret $ last operands
+    function "main" [] double $ \_ -> do
+        operand <- convert [] exprs
+        ret operand
+            where
+                convert :: MonadModuleBuilder m => LocalVariables -> [Expression] -> IRBuilderT m Operand
+                convert _ [] = CB.int32 0
+                convert scope (x:[]) = do
+                    (op, _) <- convertExpression x scope
+                    return op
+                convert scope (x:xs) = do
+                    (op, vars) <- convertExpression x scope
+                    convert vars xs
