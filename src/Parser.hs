@@ -189,8 +189,14 @@ parseFunction = Fct <$> parseFunctionDeclaration
 parseFunctionCall :: Parser Value
 parseFunctionCall = GlobCall <$> parseName <*> (parseChar "(" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* parseChar ")")
 
+parseIf :: Parser Expression
+parseIf = IfExpr <$>
+    (parseCharSequence "if" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
+    (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}") <*>
+    optional (many parseWhiteSpace *> parseCharSequence "else" *> many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+
 parseExpression :: Parser Expression
-parseExpression = parseFunction <|> parseBinExpr <|> Un <$> parseUnary
+parseExpression = parseIf <|> parseFunction <|> parseBinExpr <|> Un <$> parseUnary
 
 parseUnary :: Parser Unary
 parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)

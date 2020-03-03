@@ -113,8 +113,8 @@ instance Show Value where
     show (RealNbr n) = show n
     show (GlobVar n) = '@':n
     show (Var scope n t) = show scope ++ " " ++ n ++ ": " ++ show t
-    show (GlobCall n args) = '@':n ++ "(" ++ dispList ", " args ++ ")"
-    show (Call (Proto name _ _) args) = name ++ "(" ++ dispList ", " args ++ ")"
+    show (GlobCall n args) = '@':n ++ "(" ++ dispList " " args ++ ")"
+    show (Call (Proto name _ _) args) = name ++ "(" ++ dispList " " args ++ ")"
 
 
 data Unary = Unary [UnaryOp] Value
@@ -145,13 +145,16 @@ data Expression =
     ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
     Expr Unary BinaryOp Expression |
-    IfExpr Expression [Expression] |
+    IfExpr Expression [Expression] (Maybe [Expression])|
     WhileExpr Expression [Expression] |
     Un Unary
     deriving Eq
 
 instance Show Expression where
     show (Un unary) = show unary
+    show (IfExpr cond ifExprs Nothing) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n}"
+    show (IfExpr cond ifExprs (Just elseExprs)) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n} else {\n" ++ dispList "\n" elseExprs ++ "\n}\n"
+    show (WhileExpr cond whileExprs) = "while (" ++ show cond ++ ") {\n" ++ dispList "\n" whileExprs ++ "\n}"
     show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
     show (Fct fct) = show fct
     show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
