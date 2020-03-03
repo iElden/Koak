@@ -19,7 +19,7 @@ notImplementedTest = describe "notImplementedTest (UT)" $ do
     it "not implemented with nothing" $
         notImplemented [] `shouldBe` (([Error "Not implemented"], Nothing), [])
     it "not implemented with something" $
-        notImplemented [("trops : int", IntegerVar)] `shouldBe` (([Error "Not implemented"], Nothing), [("trops : int", IntegerVar)])
+        notImplemented [("trops : int", Var Global "trops" IntegerVar)] `shouldBe` (([Error "Not implemented"], Nothing), [("trops : int", Var Global "trops" IntegerVar)])
 
 getExprTest :: Spec
 getExprTest = describe "getExprTest (UT)" $ do
@@ -30,7 +30,7 @@ getExprTest = describe "getExprTest (UT)" $ do
 castErrorTest :: Spec
 castErrorTest = describe "castErrorTest (UT)" $ do
     it "cast from int to unknown type string" $
-        castError "ntv" IntegerVar (UnknownType "string") (Expr (Unary [] (Var "ntv" (UnknownType "string"))) Asg (Un (Unary [] (Nbr 5))))
+        castError "ntv" IntegerVar (UnknownType "string") (Expr (Unary [] (Var Local "ntv" (UnknownType "string"))) Asg (Un (Unary [] (Nbr 5))))
         `shouldBe` [Error "Cannot cast variable ntv from int to string", Info "In expression \'ntv: string = 5\'\n"]
 
 varNotFoundTest :: Spec
@@ -45,7 +45,7 @@ noEffectTest = describe "noEffectTest (UT)" $ do
         noEffect (Expr (Unary [] (GlobVar "ntv")) Asg (Expr (Unary [] (GlobVar "ntv")) Add (Un (Unary [] (Nbr 0))))) `shouldBe`
         [Warning "This statement has no effect", Info "In expression \'@ntv = @ntv + 0\'\n"]
     it "no effect found 2" $
-        noEffect (Un (Unary [] (Var "ntv" IntegerVar))) `shouldBe` [Warning "This statement has no effect", Info "In expression \'ntv: int\'\n"]
+        noEffect (Un (Unary [] (Var Global "ntv" IntegerVar))) `shouldBe` [Warning "This statement has no effect", Info "In expression \'ntv: int\'\n"]
 
 isCastValidTest :: Spec
 isCastValidTest = describe "isCastValidTest (UT)(NI)" $ do
@@ -67,10 +67,10 @@ findVarTypeTest = describe "findVarTypeTest (UT)" $ do
     it "nothing" $
         findVarType [] [] `shouldBe` Nothing
     it "type found" $
-        findVarType [("str", UnknownType "string"), ("i", IntegerVar), ("flt", FloatingVar), ("food", Void)] "i" `shouldBe`
-        (Just IntegerVar)
+        findVarType [("str", Var Global "str" (UnknownType "string")), ("i", Var Local "i" IntegerVar), ("flt", Var Local "flt" FloatingVar), ("food", Var Global "food" Void)] "i" `shouldBe`
+        (Just $ Var Local "i" IntegerVar)
     it "type not found" $
-        findVarType [("str", UnknownType "string"), ("i", IntegerVar), ("flt", FloatingVar), ("food", Void)] "zoon" `shouldBe`
+        findVarType [("str", Var Global "str" (UnknownType "string")), ("i", Var Local "i" IntegerVar), ("flt", Var Local "flt" FloatingVar), ("food", Var Global "food" Void)] "zoon" `shouldBe`
         Nothing
 
 checkExpressionTestUnaries :: Spec
@@ -79,17 +79,17 @@ checkExpressionTestUnaries = describe "checkExpressionTestUnaries (FT)" $ do
         checkExpression [] (Un (Unary [] (GlobVar "var"))) `shouldBe`
         (([Error "Use of undeclared identifier var", Info "In expression \'@var\'\n"], Nothing), [])
     it "Un (Unary ops (GlobVar v)) with scope found" $
-        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Un (Unary [] (GlobVar "var"))) `shouldBe`
-        (([], Just $ Un $ Unary [] $ Var "var" IntegerVar), [("var", IntegerVar), ("vor", FloatingVar)])
+        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Un (Unary [] (GlobVar "var"))) `shouldBe`
+        (([], Just $ Un $ Unary [] $ Var Global "var" IntegerVar), [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)])
     it "Un (Unary ops (Var v t)) with no scope" $
-        checkExpression [] (Un $ Unary [] $ Var "var" IntegerVar) `shouldBe`
-        (([], Just (Un $ Unary [] $ Var "var" IntegerVar)), [("var", IntegerVar)])
+        checkExpression [] (Un $ Unary [] $ Var Global "var" IntegerVar) `shouldBe`
+        (([], Just (Un $ Unary [] $ Var Local "var" IntegerVar)), [("var", Var Local "var" IntegerVar)])
     it "Un (Unary ops (Var v t)) with scope and cast succeed" $
-        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Un $ Unary [] $ Var "var" FloatingVar) `shouldBe`
-        (([], Just (Un $ Unary [] $ Var "var" FloatingVar)), [("var", IntegerVar), ("vor", FloatingVar)])
+        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Un $ Unary [] $ Var Global "var" FloatingVar) `shouldBe`
+        (([], Just (Un $ Unary [] $ Var Global "var" FloatingVar)), [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)])
     it "Un (Unary ops (Var v t)) with scope and cast failed" $
-        checkExpression [("var", Void), ("vor", FloatingVar)] (Un $ Unary [] $ Var "var" FloatingVar) `shouldBe`
-        (([Error "Cannot cast variable var from void to double", Info "In expression \'var: double\'\n"], Nothing), [("var", Void), ("vor", FloatingVar)])
+        checkExpression [("var", Var Global "var" Void), ("vor", Var Global "vor" FloatingVar)] (Un $ Unary [] $ Var Global "var" FloatingVar) `shouldBe`
+        (([Error "Cannot cast variable var from void to double", Info "In expression \'var: double\'\n"], Nothing), [("var", Var Global "var" Void), ("vor", Var Global "vor" FloatingVar)])
 checkExpressionTestExpressions :: Spec
 checkExpressionTestExpressions = describe "checkExpressionTestExpressions (FT)" $ do
     it "Expr (Unary ops (GlobVar v)) Asg expr) where nothing" $
@@ -100,5 +100,5 @@ checkExpressionTestExpressions = describe "checkExpressionTestExpressions (FT)" 
         (([Error "Use of undeclared identifier var", Info "In expression \'@var = @vor = 4\'\n", Error "Use of undeclared identifier vor", Info "In expression \'@vor = 4\'\n"],
         Nothing), [])
     it "var = 4 with scope for him" $
-        checkExpression [("var", IntegerVar), ("vor", FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
-        (([], Just $ (Expr (Unary [] (Var "var" IntegerVar)) Asg (Un (Unary [] (Nbr 4))))), [("var", IntegerVar), ("var", IntegerVar), ("vor", FloatingVar)])
+        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Un $ Unary [] $ Nbr 4) `shouldBe`
+        (([], Just $ (Expr (Unary [] (Var Global "var" IntegerVar)) Asg (Un (Unary [] (Nbr 4))))), [("var", Var Global "var" IntegerVar), ("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)])

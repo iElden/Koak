@@ -104,7 +104,7 @@ valueTest = describe "valueTest (UT)" $ do
     it "show globvar" $
         show (GlobVar "t") `shouldBe` "@t"
     it "show var" $
-        show (Var "t" IntegerVar) `shouldBe` "t: int"
+        show (Var Global "t" IntegerVar) `shouldBe` "global t: int"
     it "show globcall" $
         show (GlobCall "fun" []) `shouldBe` "@fun()"
     it "show globcall with args" $
@@ -112,8 +112,8 @@ valueTest = describe "valueTest (UT)" $ do
     it "show call" $
         show (Call (Proto "func" [] Void) []) `shouldBe` "func()"
     it "show call with args" $
-        show (Call (Proto "func" [] IntegerVar) [toExpr $ Nbr 3, toExpr $ RealNbr 2.54, toExpr $ Var "tru" IntegerVar]) `shouldBe`
-        "func(3, 2.54, tru: int)"
+        show (Call (Proto "func" [] IntegerVar) [toExpr $ Nbr 3, toExpr $ RealNbr 2.54, toExpr $ Var Global "tru" IntegerVar]) `shouldBe`
+        "func(3, 2.54, global tru: int)"
 
 unaryTest :: Spec
 unaryTest = describe "unaryTest (UT)" $ do
@@ -140,8 +140,8 @@ functionDeclarationTest :: Spec
 functionDeclarationTest = describe "funcitonDeclarationTest (UT)" $ do
     it "show fct" $
         show (Decl (Proto "func" [("a", IntegerVar), ("b", FloatingVar)] FloatingVar)
-        [(Expr (Unary [Minus] (Var "a" IntegerVar)) Sub (Un (Unary [] (Var "b" FloatingVar))))])
-        `shouldBe` "def func(a: int, b: double): double {\n-a: int - b: double\n}"
+        [(Expr (Unary [Minus] (Var Global "a" IntegerVar)) Sub (Un (Unary [] (Var Local "b" FloatingVar))))])
+        `shouldBe` "def func(a: int, b: double): double {\n-global a: int - local b: double\n}"
 
 expressionShowTest :: Spec
 expressionShowTest = describe "ExpressionShowTest (UT)" $ do
