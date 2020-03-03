@@ -199,9 +199,9 @@ parseTypedIdentifierTest = describe "parseTypedIdentifierTest (FT)" $ do
     it "parse nothing" $
         runParser parseTypedIdentifier [] `shouldBe` Nothing
     it "parses correct type" $
-        runParser parseTypedIdentifier "i:int" `shouldBe` Just (Var Local "i" IntegerVar, [])
+        runParser parseTypedIdentifier "local i:int" `shouldBe` Just (Var Local "i" IntegerVar, [])
     it "parses correct types with spaces" $
-        runParser parseTypedIdentifier "dub    :    double  " `shouldBe` Just (Var Global "dub" FloatingVar, "  ")
+        runParser parseTypedIdentifier "global     dub    :    double  " `shouldBe` Just (Var Global "dub" FloatingVar, "  ")
     it "incorrect pattern typed identifier" $
         runParser parseTypedIdentifier "voi:" `shouldBe` Nothing
     it "incorrect pattern typed identifier 2" $
@@ -302,7 +302,7 @@ parseUnaryTest = describe "parseUnaryTest (FT)" $ do
     it "identifier typed but actually failed" $
         runParser parseUnary "!t:" `shouldBe` Just (Unary [BoolNot] (GlobVar "t"), ":")
     it "typed identifiers test" $
-        runParser parseUnary "!t:int" `shouldBe` Just (Unary [BoolNot] (Var Global "t" IntegerVar), [])
+        runParser parseUnary "!global t:int" `shouldBe` Just (Unary [BoolNot] (Var Global "t" IntegerVar), [])
     it "NOT ." $
         runParser parseUnary "!." `shouldBe` Just (Unary [BoolNot] (RealNbr 0.0), [])
 
@@ -341,13 +341,13 @@ parseFileTest = describe "parseFileTest (FT)" $ do
     it "nothing" $
         runParser parseFile [] `shouldBe` Nothing
     it "parse file testAssign" $
-        runParser parseFile "test: int = 0\ntest2 = 0\ntest = 1"
+        runParser parseFile "local test: int = 0\ntest2 = 0\ntest = 1"
         `shouldBe`
         Just ([Expr (Unary [] (Var Local "test" IntegerVar)) Asg (Un (Unary [] (Nbr 0))),
         Expr (Unary [] (GlobVar "test2")) Asg (Un (Unary [] (Nbr 0))),
         Expr (Unary [] (GlobVar "test")) Asg (Un (Unary [] (Nbr 1)))], [])
     it "parse file testFile" $
-        runParser parseFile "test: int = 0\ntest = test + 1\ntest2: double\ntest = test2: int - 5\n2 test"
+        runParser parseFile "global test: int = 0\ntest = test + 1\nlocal test2: double\ntest = global test2: int - 5\n2 test"
         `shouldBe`
         Just ([Expr (Unary [] (Var Global "test" IntegerVar)) Asg (Un (Unary [] (Nbr 0))),
         Expr (Unary [] (GlobVar "test")) Asg (Expr (Unary [] (GlobVar "test")) Add (Un (Unary [] (Nbr 1)))),
