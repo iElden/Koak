@@ -145,6 +145,8 @@ data Expression =
     ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
     Expr Unary BinaryOp Expression |
+    IfExpr Expression [Expression] |
+    WhileExpr Expression [Expression] |
     Un Unary
     deriving Eq
 

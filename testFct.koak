@@ -1,5 +1,5 @@
 def test(var1: int var2: double): double {
-    a : double = var1 + var2 + 1
+    local a : double = var1 + var2 + 1
     2 + a
 }
 

@@ -44,7 +44,7 @@ noEffect e = [Warning "This statement has no effect", getExpr e]
 isCastValid :: Type -> Type -> Bool
 isCastValid IntegerVar FloatingVar = True
 isCastValid FloatingVar IntegerVar = True
-isCastValid _ _ = False
+isCastValid a b = a == b
 
 findVarType :: Scope -> String -> Maybe Value
 findVarType [] _ = Nothing
