@@ -106,7 +106,7 @@ convertValue (AST.Call (Proto name params retType) args) vars = do
 
 
 convertExpression :: MonadModuleBuilder m => Expression -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
-convertExpression (Un (Unary [] val)) vars = do
+convertExpression (Unary [] val) vars = do
     op <- convertValue val vars
     return $ (op, vars)
 convertExpression (Fct (Decl proto expr)) vars = do

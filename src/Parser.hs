@@ -178,7 +178,7 @@ parseName :: Parser String
 parseName = (((:) <$> parseAlpha <*> many parseAlphaNum) <* many parseWhiteSpace)
 
 parseBinExpr :: Parser Expression
-parseBinExpr = Expr <$> (many parseWhiteSpace *> parseUnary <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
+parseBinExpr = Expr <$> (many parseWhiteSpace *> parseExpression <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
 
 parseArgument :: Parser (String, Type)
 parseArgument = (,) <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
@@ -206,11 +206,11 @@ parseWhile = WhileExpr <$>
     (parseCharSequence "while" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
-parseExpression :: Parser Expression
-parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr <|> Un <$> parseUnary
-
-parseUnary :: Parser Unary
+parseUnary :: Parser Expression
 parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
+
+parseExpression :: Parser Expression
+parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr <|> parseUnary
 
 parseLiteral :: Parser Value
 parseLiteral = parseFunctionCall <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier

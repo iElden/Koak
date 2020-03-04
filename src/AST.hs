@@ -3,7 +3,6 @@ module AST (
     BinaryOp (..),
     UnaryOp (..),
     Value (..),
-    Unary (..),
     FunctionPrototype (..),
     FunctionDeclaration (..),
     Expression (..),
@@ -117,13 +116,6 @@ instance Show Value where
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList " " args ++ ")"
 
 
-data Unary = Unary [UnaryOp] Value
-    deriving Eq
-
-instance Show Unary where
-    show (Unary ops v) = dispList "" ops ++ show v
-
-
 data FunctionPrototype =
     Proto String [(String, Type)] Type
     deriving Eq
@@ -147,11 +139,10 @@ data Expression =
     Expr Expression BinaryOp Expression |
     IfExpr Expression [Expression] (Maybe [Expression]) |
     WhileExpr Expression [Expression] |
-    Un Unary
+    Unary [UnaryOp] Value
     deriving Eq
 
 instance Show Expression where
-    show (Un unary) = show unary
     show (IfExpr cond ifExprs Nothing) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n}"
     show (IfExpr cond ifExprs (Just elseExprs)) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n} else {\n" ++ dispList "\n" elseExprs ++ "\n}"
     show (WhileExpr cond whileExprs) = "while (" ++ show cond ++ ") {\n" ++ dispList "\n" whileExprs ++ "\n}"
@@ -159,3 +150,4 @@ instance Show Expression where
     show (Fct fct) = show fct
     show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
     show (ExtFct val) = "extern " ++ show val
+    show (Unary ops v) = dispList "" ops ++ show v

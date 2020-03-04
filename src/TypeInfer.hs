@@ -53,22 +53,22 @@ findVarType ((varName, var):scope) name
     | otherwise = findVarType scope name
 
 checkExpression :: Scope -> Expression -> (([Message], Maybe Expression), Scope)
-checkExpression scope val@(Un (Unary ops (GlobVar v))) = case findVarType scope v of
+checkExpression scope val@(Unary ops (GlobVar v)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
-    Just t -> (([], Just $ Un $ Unary ops t), scope)
-checkExpression scope val@(Un (Unary ops var@(Var _ v _))) = case findVarType scope v of
+    Just t -> (([], Just $ Unary ops t), scope)
+checkExpression scope val@(Unary ops var@(Var _ v _)) = case findVarType scope v of
     Nothing -> (([], Just val), (v, var):scope)
     Just t2 -> (([
         Error $ "Variable " ++ v ++ " was previously defined",
         Info $ "-> " ++ show t2,
         getExpr val
         ], Nothing), scope)
-checkExpression scope val@(Un (Unary ops (GlobCall v args))) = case findVarType scope v of
+checkExpression scope val@(Unary ops (GlobCall v args)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
     Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
         True -> case inferTypes scope args of
             (msgs, Nothing) -> ((msgs, Nothing), scope)
-            (msgs, Just va) -> ((msgs, Just $ Un $ (Unary ops $ Call proto va)), scope)
+            (msgs, Just va) -> ((msgs, Just $ Unary ops $ Call proto va), scope)
         False -> (([Error $ "Not enough arguments for function " ++ show proto, getExpr val], Nothing), scope)
     Just t -> (([Error $ "Cannot call " ++ show t, getExpr val], Nothing), scope)
 
