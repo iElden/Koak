@@ -201,8 +201,13 @@ parseIf = IfExpr <$>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}") <*>
     optional (many parseWhiteSpace *> parseCharSequence "else" *> many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
+parseWhile :: Parser Expression
+parseWhile = WhileExpr <$>
+    (parseCharSequence "while" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
+    (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+
 parseExpression :: Parser Expression
-parseExpression = parseIf <|> parseFunction <|> parseBinExpr <|> Un <$> parseUnary
+parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr <|> Un <$> parseUnary
 
 parseUnary :: Parser Unary
 parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)

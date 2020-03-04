@@ -85,6 +85,12 @@ checkExpression scope (IfExpr cond ifExprs (Just elseExprs)) =  case checkExpres
              (ms, Nothing) -> ((msgs ++ ms, Nothing), scope)
              (ms, elseExpr) -> ((msgs ++ ms, Just $ IfExpr econd expr elseExpr), scope)
 
+checkExpression scope (WhileExpr cond ifExprs) = case checkExpression scope cond of
+    expr@((_, Nothing), _) -> expr
+    ((msgs, Just econd), newScope) -> case inferTypes scope ifExprs of
+        (msgs, Nothing) -> ((msgs, Nothing), newScope)
+        (msgs, Just expr) -> ((msgs, Just $ WhileExpr econd expr), newScope)
+
 checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
     Nothing -> case checkExpression scope expr of
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
