@@ -116,8 +116,11 @@ parseDouble = do
 parseIdentifier :: Parser Value
 parseIdentifier = GlobVar <$> ((:) <$> parseAlpha <*> many parseAlphaNum)
 
-parseType :: Parser Type
-parseType = do
+parseFunctionType :: Parser Type
+parseFunctionType = Function <$> (Proto "" <$> (parseChar "(" *> many ((,) <$> many parseAlpha <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)) <* parseChar ")") <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType))
+
+parseBuiltinType :: Parser Type
+parseBuiltinType = do
     t <- (:) <$> parseAlpha <*> many parseAlphaNum
     case t of
         "int" -> return IntegerVar
@@ -125,6 +128,9 @@ parseType = do
         "double" -> return FloatingVar
         "" -> empty
         _ -> return $ UnknownType t
+
+parseType :: Parser Type
+parseType = parseBuiltinType <|> parseFunctionType
 
 parseScopeIdentifier :: Parser VarScope
 parseScopeIdentifier = do
