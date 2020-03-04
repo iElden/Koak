@@ -108,12 +108,12 @@ valueTest = describe "valueTest (UT)" $ do
     it "show globcall" $
         show (GlobCall "fun" []) `shouldBe` "@fun()"
     it "show globcall with args" $
-        show (GlobCall "t" [toExpr $ Nbr 4, toExpr $ RealNbr 3.2, toExpr $ GlobVar "u"]) `shouldBe` "@t(4, 3.2, @u)"
+        show (GlobCall "t" [toExpr $ Nbr 4, toExpr $ RealNbr 3.2, toExpr $ GlobVar "u"]) `shouldBe` "@t(4 3.2 @u)"
     it "show call" $
         show (Call (Proto "func" [] Void) []) `shouldBe` "func()"
     it "show call with args" $
         show (Call (Proto "func" [] IntegerVar) [toExpr $ Nbr 3, toExpr $ RealNbr 2.54, toExpr $ Var Global "tru" IntegerVar]) `shouldBe`
-        "func(3, 2.54, global tru: int)"
+        "func(3 2.54 global tru: int)"
 
 unaryTest :: Spec
 unaryTest = describe "unaryTest (UT)" $ do
