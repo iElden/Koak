@@ -96,8 +96,7 @@ convertVariable (Var Local n t) expr vars = do
 convertValue :: MonadModuleBuilder m => Value -> LocalVariables -> IRBuilderT m Operand
 convertValue (Nbr n) _ = CB.double $ fromIntegral n
 convertValue (RealNbr n) _ = CB.double n
-convertValue (Var _ n FloatingVar) vars = lookupVariable n vars
-convertValue (Var _ n IntegerVar) vars = lookupVariable n vars
+convertValue (Var _ n _) vars = lookupVariable n vars
 convertValue (AST.Call (Proto name params retType) args) vars = do
     parameters <- getParamsValueInLLVM args vars
     call (ConstantOperand $ C.GlobalReference (FunctionType floatType (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters
