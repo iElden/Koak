@@ -40,6 +40,8 @@ data BinaryOp =
     Div |
     And |
     Or  |
+    BAnd|
+    BOr |
     Xor |
     Pow |
     Mod |
@@ -146,7 +148,7 @@ instance Show Expression where
     show (IfExpr cond ifExprs Nothing) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n}"
     show (IfExpr cond ifExprs (Just elseExprs)) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n} else {\n" ++ dispList "\n" elseExprs ++ "\n}"
     show (WhileExpr cond whileExprs) = "while (" ++ show cond ++ ") {\n" ++ dispList "\n" whileExprs ++ "\n}"
-    show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
+    show (Expr unary op expr) = "(" ++ show unary ++ ") " ++ show op ++ " (" ++ show expr ++ ")"
     show (Fct fct) = show fct
     show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
     show (ExtFct val) = "extern " ++ show val

@@ -9,7 +9,7 @@ def test3() : (): int {
 def test(var1: int var2: double): double {
     local a : double = var1 + var2 + 1
     a = test2
-    2 + a + a
+    (2 + a) * a
 }
 
 global x: int = 0
