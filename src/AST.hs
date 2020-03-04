@@ -144,7 +144,7 @@ data Expression =
     ExtVar (String, Type) |
     ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
-    Expr Unary BinaryOp Expression |
+    Expr Expression BinaryOp Expression |
     IfExpr Expression [Expression] (Maybe [Expression]) |
     WhileExpr Expression [Expression] |
     Un Unary
