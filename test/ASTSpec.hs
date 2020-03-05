@@ -141,7 +141,7 @@ functionDeclarationTest = describe "funcitonDeclarationTest (UT)" $ do
     it "show fct" $
         show (Decl (Proto "func" [("a", IntegerVar), ("b", FloatingVar)] FloatingVar)
         [(Expr (Unary [Minus] (Var Global "a" IntegerVar)) Sub (Unary [] (Var Local "b" FloatingVar)))])
-        `shouldBe` "def func(a: int, b: double): double {\n-global a: int - local b: double\n}"
+        `shouldBe` "def func(a: int, b: double): double {\n(-global a: int) - (local b: double)\n}"
 
 expressionShowTest :: Spec
 expressionShowTest = describe "ExpressionShowTest (UT)" $ do
@@ -149,7 +149,7 @@ expressionShowTest = describe "ExpressionShowTest (UT)" $ do
         show (Unary [] (RealNbr $ 5.0)) `shouldBe` "5.0"
     it "show unary binop Exp" $
         show (Expr (Unary [] (Nbr 4)) Add (Unary [Minus] (RealNbr $ 5.0))) `shouldBe`
-        "4 + -5.0"
+        "(4) + (-5.0)"
     it "show fct" $
         show (Fct (Decl (Proto "Func" [("tr", IntegerVar)] IntegerVar) [])) `shouldBe`
         "def Func(tr: int): int {\n\n}"
