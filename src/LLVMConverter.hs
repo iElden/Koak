@@ -109,26 +109,26 @@ convertExpression :: MonadModuleBuilder m => Expression -> LocalVariables -> IRB
 convertExpression (Unary [] val) vars = do
     op <- convertValue val vars
     return $ (op, vars)
+convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Fct (Decl proto expr)) vars = do
     op <- convertFunction proto expr
     return $ (op, vars)
-convertExpression (Expr (Unary [] val) AST.Add expr) vars = do
-    leftOp <- convertValue val vars
-    (rightOp, locs) <- convertExpression expr vars
-    fmap (\s -> (s, locs)) $ fadd leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Sub expr) vars = do
-    leftOp <- convertValue val vars
-    (rightOp, locs) <- convertExpression expr vars
-    fmap (\s -> (s, locs)) $ fsub leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Mul expr) vars = do
-    leftOp <- convertValue val vars
-    (rightOp, locs) <- convertExpression expr vars
-    fmap (\s -> (s, locs)) $ fmul leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Div expr) vars = do
-    leftOp <- convertValue val vars
-    (rightOp, locs) <- convertExpression expr vars
-    fmap (\s -> (s, locs)) $ fdiv leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
+convertExpression (Expr firstExpr AST.Add secExpr) vars = do
+    (leftOp, _) <- convertExpression firstExpr vars
+    (rightOp, _) <- convertExpression secExpr vars
+    fmap (\s -> (s, vars)) $ fadd leftOp rightOp
+convertExpression (Expr firstExpr AST.Sub secExpr) vars = do
+    (leftOp, _) <- convertExpression firstExpr vars
+    (rightOp, _) <- convertExpression secExpr vars
+    fmap (\s -> (s, vars)) $ fsub leftOp rightOp
+convertExpression (Expr firstExpr AST.Mul secExpr) vars = do
+    (leftOp, _) <- convertExpression firstExpr vars
+    (rightOp, _) <- convertExpression secExpr vars
+    fmap (\s -> (s, vars)) $ fmul leftOp rightOp
+convertExpression (Expr firstExpr AST.Div secExpr) vars = do
+    (leftOp, _) <- convertExpression firstExpr vars
+    (rightOp, _) <- convertExpression secExpr vars
+    fmap (\s -> (s, vars)) $ fdiv leftOp rightOp
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do

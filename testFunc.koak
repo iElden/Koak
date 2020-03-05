@@ -1,0 +1,2 @@
+global x: int = 0
+x == 0
