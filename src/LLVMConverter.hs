@@ -14,6 +14,8 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Operand as O
 import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.ParameterAttribute as PA
+import qualified LLVM.AST.Instruction as Ins
+import qualified LLVM.AST.FloatingPointPredicate as FPP
 
 import Data.String
 import LLVM.IRBuilder.Module
@@ -63,20 +65,48 @@ getASTLType _ = floatType
 --    ops <- convertExpression x vars
 --    convertNewExpression xs $ snd ops
 
+executeExpressionsConversion :: MonadModuleBuilder m => LocalVariables -> [Expression] -> IRBuilderT m Operand
+executeExpressionsConversion _ [] = CB.int32 0
+executeExpressionsConversion scope (x:[]) = do
+    (op, _) <- convertExpression x scope
+    return op
+executeExpressionsConversion scope (x:xs) = do
+    (op, vars) <- convertExpression x scope
+    executeExpressionsConversion vars xs
+
+convertIfExpr :: MonadModuleBuilder m => Expression -> LocalVariables -> IRBuilderT m Operand
+convertIfExpr (IfExpr expr thenExpr Nothing) vars = do
+    (equ, locs) <- convertExpression expr vars
+    thenN <- fresh
+    endN <- fresh
+    condBr equ thenN endN
+    emitBlockStart thenN
+    thenOp <- executeExpressionsConversion vars thenExpr
+    emitTerm $ Ins.Resume thenOp []
+    emitBlockStart endN
+    return thenOp
+convertIfExpr (IfExpr expr thenExpr (Just elseExpr)) vars = do
+    (equ, locs) <- convertExpression expr vars
+    thenN <- fresh
+    elseN <- fresh
+    endN <- fresh
+    condBr equ thenN elseN
+    emitBlockStart thenN
+    thenOp <- executeExpressionsConversion vars thenExpr
+    emitTerm $ Ins.Br endN []
+    emitBlockStart elseN
+    elseOp <- executeExpressionsConversion vars elseExpr
+    emitTerm $ Ins.Resume elseOp []
+    emitBlockStart endN
+    return thenOp
+
+
+
 convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs = do
     function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
-        operand <- convert (putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs -- Update le tableau de vars pour qu'il soit envoyé dans convert Expression
+        operand <- executeExpressionsConversion (putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
         ret operand
-            where
-                convert :: MonadModuleBuilder m => LocalVariables -> [Expression] -> IRBuilderT m Operand
-                convert _ [] = CB.int32 0
-                convert scope (x:[]) = do
-                    (op, _) <- convertExpression x scope
-                    return op
-                convert scope (x:xs) = do
-                    (op, vars) <- convertExpression x scope
-                    convert vars xs
 
 
 
@@ -90,7 +120,6 @@ convertVariable (Var Local n t) expr vars = do
     (res, _) <- convertExpression expr vars
     case res of
         op -> return (op, [(getASTLType t, n, Just op)] ++ vars)
-        _ -> fmap (\s -> (s, vars)) $ global (fromString n) floatType $ (C.Float $ F.Double 0.0)
 
 
 convertValue :: MonadModuleBuilder m => Value -> LocalVariables -> IRBuilderT m Operand
@@ -108,10 +137,10 @@ convertValue (AST.Call (Proto name params retType) args) vars = do
 convertExpression :: MonadModuleBuilder m => Expression -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
 convertExpression (Un (Unary [] val)) vars = do
     op <- convertValue val vars
-    return $ (op, vars)
+    return (op, vars)
 convertExpression (Fct (Decl proto expr)) vars = do
     op <- convertFunction proto expr
-    return $ (op, vars)
+    return (op, vars)
 convertExpression (Expr (Unary [] val) AST.Add expr) vars = do
     leftOp <- convertValue val vars
     (rightOp, locs) <- convertExpression expr vars
@@ -128,7 +157,14 @@ convertExpression (Expr (Unary [] val) AST.Div expr) vars = do
     leftOp <- convertValue val vars
     (rightOp, locs) <- convertExpression expr vars
     fmap (\s -> (s, locs)) $ fdiv leftOp rightOp
+convertExpression (Expr (Unary [] val) AST.Equ expr) vars = do
+    leftOp <- convertValue val vars
+    (rightOp, locs) <- convertExpression expr vars
+    fmap (\s -> (s, locs)) $ fcmp FPP.UEQ leftOp rightOp
 convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
+convertExpression ex@(IfExpr expr thenExpr elseExpr) vars = do
+    op <- convertIfExpr ex vars
+    return (op, vars)
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
@@ -137,14 +173,5 @@ makeASTModule name [] = buildModule (fromString name) $ do
         ret $ value
 makeASTModule name exprs = buildModule (fromString name) $ do
     function "main" [] double $ \_ -> do
-        operand <- convert [] exprs
+        operand <- executeExpressionsConversion [] exprs
         ret operand
-            where
-                convert :: MonadModuleBuilder m => LocalVariables -> [Expression] -> IRBuilderT m Operand
-                convert _ [] = CB.int32 0
-                convert scope (x:[]) = do
-                    (op, _) <- convertExpression x scope
-                    return op
-                convert scope (x:xs) = do
-                    (op, vars) <- convertExpression x scope
-                    convert vars xs

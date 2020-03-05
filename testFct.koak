@@ -2,13 +2,8 @@ def test2() : int {
     1
 }
 
-def test3() : (): int {
-    test2
-}
-
 def test(var1: int var2: double): double {
     local a : double = var1 + var2 + 1
-    a = test2
     2 + a + a
 }
 
@@ -20,9 +15,5 @@ if (x == 0) {
 }
 
 if (x == 1) {
-    test(1 2)
-}
-
-while (x == 1) {
     test(1 2)
 }
