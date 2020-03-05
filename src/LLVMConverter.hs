@@ -162,7 +162,7 @@ convertExpression (Expr firstExpr AST.Div secExpr) vars = do
     fmap (\s -> (s, vars)) $ fdiv leftOp rightOp
 convertExpression (Expr firstExpr AST.Equ secExpr) vars = do
     (leftOp, _) <- convertExpression firstExpr vars
-    (rightOp, _) <- convertExpression expr vars
+    (rightOp, _) <- convertExpression secExpr vars
     fmap (\s -> (s, vars)) $ fcmp FPP.UEQ leftOp rightOp
 convertExpression ex@(IfExpr expr thenExpr elseExpr) vars = do
     op <- convertIfExpr ex vars
