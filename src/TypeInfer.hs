@@ -100,6 +100,10 @@ checkExpression scope (Expr (Unary ops val@(Var _ v t)) Asg expr) = case checkEx
     va -> va
 checkExpression scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
+checkExpression scope expr@(Cast t ex) = case checkExpression scope ex of
+    ((msgs, Just x), newScope) -> ((msgs, Just $ Cast t x), newScope)
+    va -> va
+
 checkExpression scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
     Nothing ->
         case filter ((/=) Nothing) $ fmap (\(s, t) -> findVarType scope s) args of
