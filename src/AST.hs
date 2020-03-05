@@ -3,7 +3,6 @@ module AST (
     BinaryOp (..),
     UnaryOp (..),
     Value (..),
-    Unary (..),
     FunctionPrototype (..),
     FunctionDeclaration (..),
     Expression (..),
@@ -41,6 +40,8 @@ data BinaryOp =
     Div |
     And |
     Or  |
+    BAnd|
+    BOr |
     Xor |
     Pow |
     Mod |
@@ -117,13 +118,6 @@ instance Show Value where
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList " " args ++ ")"
 
 
-data Unary = Unary [UnaryOp] Value
-    deriving Eq
-
-instance Show Unary where
-    show (Unary ops v) = dispList "" ops ++ show v
-
-
 data FunctionPrototype =
     Proto String [(String, Type)] Type
     deriving Eq
@@ -144,18 +138,18 @@ data Expression =
     ExtVar (String, Type) |
     ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
-    Expr Unary BinaryOp Expression |
+    Expr Expression BinaryOp Expression |
     IfExpr Expression [Expression] (Maybe [Expression]) |
     WhileExpr Expression [Expression] |
-    Un Unary
+    Unary [UnaryOp] Value
     deriving Eq
 
 instance Show Expression where
-    show (Un unary) = show unary
     show (IfExpr cond ifExprs Nothing) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n}"
     show (IfExpr cond ifExprs (Just elseExprs)) = "if (" ++ show cond ++ ") {\n" ++ dispList "\n" ifExprs ++ "\n} else {\n" ++ dispList "\n" elseExprs ++ "\n}"
     show (WhileExpr cond whileExprs) = "while (" ++ show cond ++ ") {\n" ++ dispList "\n" whileExprs ++ "\n}"
-    show (Expr unary op expr) = show unary ++ " " ++ show op ++ " " ++ show expr
+    show (Expr unary op expr) = "(" ++ show unary ++ ") " ++ show op ++ " (" ++ show expr ++ ")"
     show (Fct fct) = show fct
     show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
     show (ExtFct val) = "extern " ++ show val
+    show (Unary ops v) = dispList "" ops ++ show v

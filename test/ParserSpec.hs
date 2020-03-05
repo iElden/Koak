@@ -212,47 +212,47 @@ parseTypedIdentifierTest = describe "parseTypedIdentifierTest (FT)" $ do
 parseBinOpTest :: Spec
 parseBinOpTest = describe "parseBinOpTest (UT)" $ do
     it "parse nothing" $
-        runParser parseBinOp [] `shouldBe` Nothing
+        runParser (parseBinOp 0)[] `shouldBe` Nothing
     it "parse add with space" $
-        runParser parseBinOp "       +  " `shouldBe` Just (Add, "  ")
+        runParser (parseBinOp 9) "       +  " `shouldBe` Just (Add, "  ")
     it "parse add" $
-        runParser parseBinOp "+" `shouldBe` Just (Add, [])
+        runParser (parseBinOp 9) "+" `shouldBe` Just (Add, [])
     it "parse sub" $
-        runParser parseBinOp "-" `shouldBe` Just (Sub, [])
+        runParser (parseBinOp 9) "-" `shouldBe` Just (Sub, [])
     it "parse mul" $
-        runParser parseBinOp "*" `shouldBe` Just (Mul, [])
+        runParser (parseBinOp 10) "*" `shouldBe` Just (Mul, [])
     it "parse div" $
-        runParser parseBinOp "/" `shouldBe` Just (Div, [])
+        runParser (parseBinOp 10) "/" `shouldBe` Just (Div, [])
     it "parse and" $
-        runParser parseBinOp "&" `shouldBe` Just (And, [])
+        runParser (parseBinOp 5) "&" `shouldBe` Just (And, [])
     it "parse or" $
-        runParser parseBinOp "|" `shouldBe` Just (Or, [])
+        runParser (parseBinOp 3) "|" `shouldBe` Just (Or, [])
     it "parse xor" $
-        runParser parseBinOp "^" `shouldBe` Just (Xor, [])
+        runParser (parseBinOp 4) "^" `shouldBe` Just (Xor, [])
     it "parse pow" $
-        runParser parseBinOp "**" `shouldBe` Just (Pow, [])
+        runParser (parseBinOp 11) "**" `shouldBe` Just (Pow, [])
     it "parse mod" $
-        runParser parseBinOp "%" `shouldBe` Just (Mod, [])
+        runParser (parseBinOp 10) "%" `shouldBe` Just (Mod, [])
     it "parse rsh" $
-        runParser parseBinOp ">>" `shouldBe` Just (RSh, [])
+        runParser (parseBinOp 8) ">>" `shouldBe` Just (RSh, [])
     it "parse lsh" $
-        runParser parseBinOp "<<" `shouldBe` Just (LSh, [])
+        runParser (parseBinOp 8) "<<" `shouldBe` Just (LSh, [])
     it "parse equ" $
-        runParser parseBinOp "==" `shouldBe` Just (Equ, [])
+        runParser (parseBinOp 6) "==" `shouldBe` Just (Equ, [])
     it "parse neq" $
-        runParser parseBinOp "!=" `shouldBe` Just (Neq, [])
+        runParser (parseBinOp 6) "!=" `shouldBe` Just (Neq, [])
     it "parse gt" $
-        runParser parseBinOp ">" `shouldBe` Just (Gt, [])
+        runParser (parseBinOp 7) ">" `shouldBe` Just (Gt, [])
     it "parse gte" $
-        runParser parseBinOp ">=" `shouldBe` Just (Gte, [])
+        runParser (parseBinOp 7) ">=" `shouldBe` Just (Gte, [])
     it "parse lt" $
-        runParser parseBinOp "<" `shouldBe` Just (Lt, [])
+        runParser (parseBinOp 7) "<" `shouldBe` Just (Lt, [])
     it "parse lte" $
-        runParser parseBinOp "<=" `shouldBe` Just (Lte, [])
+        runParser (parseBinOp 7) "<=" `shouldBe` Just (Lte, [])
     it "parse asg" $
-        runParser parseBinOp "=" `shouldBe` Just (Asg, [])
+        runParser (parseBinOp 0) "=" `shouldBe` Just (Asg, [])
     it "parse notBin" $
-        runParser parseBinOp ":" `shouldBe` Nothing
+        runParser (parseBinOp 0) ":" `shouldBe` Nothing
 
 parseUnOpTest :: Spec
 parseUnOpTest = describe "parseUnOpTest (UT)" $ do
@@ -274,15 +274,15 @@ parseUnOpTest = describe "parseUnOpTest (UT)" $ do
 parseBinExprTest :: Spec
 parseBinExprTest = describe "parseBinExprTest (FT)" $ do
     it "parse nothing" $
-        runParser parseBinExpr [] `shouldBe` Nothing
+        runParser (parseBinExpr 0) [] `shouldBe` Nothing
     it "parse correct binary" $
-        runParser parseBinExpr "3<4" `shouldBe` Just (Expr (Unary [] (Nbr 3)) Lt (Un (Unary [] (Nbr 4))), [])
+        runParser (parseBinExpr 0) "3<4" `shouldBe` Just (Expr (Unary [] (Nbr 3)) Lt (Unary [] (Nbr 4)), [])
     it "parse not correct binary" $
-        runParser parseBinExpr "<4" `shouldBe` Nothing
+        runParser (parseBinExpr 0) "<4" `shouldBe` Nothing
     it "parse not correct binary 2" $
-        runParser parseBinExpr "4<" `shouldBe` Nothing
+        runParser (parseBinExpr 0) "4<" `shouldBe` Nothing
     it "parse t=." $
-        runParser parseBinExpr "t=." `shouldBe` Just (Expr (Unary [] (GlobVar "t")) Asg (Un (Unary [] (RealNbr 0.0))), [])
+        runParser (parseBinExpr 0) "t=." `shouldBe` Just (Expr (Unary [] (GlobVar "t")) Asg (Unary [] (RealNbr 0.0)), [])
 
 
 parseUnaryTest :: Spec
@@ -311,9 +311,9 @@ parseExpressionTest = describe "parseExpressionTest (FT)" $ do
     it "parse nothing" $
         runParser parseExpression [] `shouldBe` Nothing
     it "parse number" $
-        runParser parseExpression "4" `shouldBe` Just (Un (Unary [] (Nbr 4)), [])
+        runParser parseExpression "4" `shouldBe` Just ((Unary [] (Nbr 4)), [])
     it "parse expr" $
-        runParser parseExpression "4+5.0" `shouldBe` Just (Expr (Unary [] (Nbr 4)) Add (Un (Unary [] (RealNbr (5.0)))), [])
+        runParser parseExpression "4+5.0" `shouldBe` Just (Expr (Unary [] (Nbr 4)) Add ((Unary [] (RealNbr (5.0)))), [])
     it "parse wrong expr" $
         runParser parseExpression "\"" `shouldBe` Nothing
 
@@ -343,15 +343,15 @@ parseFileTest = describe "parseFileTest (FT)" $ do
     it "parse file testAssign" $
         runParser parseFile "local test: int = 0\ntest2 = 0\ntest = 1"
         `shouldBe`
-        Just ([Expr (Unary [] (Var Local "test" IntegerVar)) Asg (Un (Unary [] (Nbr 0))),
-        Expr (Unary [] (GlobVar "test2")) Asg (Un (Unary [] (Nbr 0))),
-        Expr (Unary [] (GlobVar "test")) Asg (Un (Unary [] (Nbr 1)))], [])
+        Just ([Expr (Unary [] (Var Local "test" IntegerVar)) Asg ((Unary [] (Nbr 0))),
+        Expr (Unary [] (GlobVar "test2")) Asg ((Unary [] (Nbr 0))),
+        Expr (Unary [] (GlobVar "test")) Asg ((Unary [] (Nbr 1)))], [])
     it "parse file testFile" $
         runParser parseFile "global test: int = 0\ntest = test + 1\nlocal test2: double\ntest = global test2: int - 5\n2 test"
         `shouldBe`
-        Just ([Expr (Unary [] (Var Global "test" IntegerVar)) Asg (Un (Unary [] (Nbr 0))),
-        Expr (Unary [] (GlobVar "test")) Asg (Expr (Unary [] (GlobVar "test")) Add (Un (Unary [] (Nbr 1)))),
-        Un (Unary [] (Var Local "test2" FloatingVar)),
-        Expr (Unary [] (GlobVar "test")) Asg (Expr (Unary [] (Var Global "test2" IntegerVar)) Sub (Un (Unary [] (Nbr 5)))),
-        Un (Unary [] (Nbr 2)),
-        Un (Unary [] (GlobVar "test"))], [])
+        Just ([Expr (Unary [] (Var Global "test" IntegerVar)) Asg ((Unary [] (Nbr 0))),
+        Expr (Unary [] (GlobVar "test")) Asg (Expr (Unary [] (GlobVar "test")) Add ((Unary [] (Nbr 1)))),
+        (Unary [] (Var Local "test2" FloatingVar)),
+        Expr (Unary [] (GlobVar "test")) Asg (Expr (Unary [] (Var Global "test2" IntegerVar)) Sub ((Unary [] (Nbr 5)))),
+        (Unary [] (Nbr 2)),
+        (Unary [] (GlobVar "test"))], [])

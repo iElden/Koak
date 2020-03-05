@@ -96,8 +96,11 @@ parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
 parseAlphaNum :: Parser Char
 parseAlphaNum = parseDigit <|> parseAlpha
 
+parseSoftSeparator :: Parser Char
+parseSoftSeparator = parseChar " \t"
+
 parseWhiteSpace :: Parser Char
-parseWhiteSpace = parseChar " \t\n"
+parseWhiteSpace = parseSoftSeparator <|> parseChar "\n"
 
 parseInteger :: Parser Value
 parseInteger = do
@@ -142,9 +145,24 @@ parseScopeIdentifier = do
 parseTypedIdentifier :: Parser Value
 parseTypedIdentifier = Var <$> parseScopeIdentifier <*> (many parseWhiteSpace *> ((:) <$> parseAlpha <*> many parseAlphaNum)) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
 
-parseBinOp :: Parser BinaryOp
-parseBinOp = do
-    test <- many parseWhiteSpace *> parseString ["+", "-", "**", "*", "/", "&", "|", "^", "%", ">>", "<<", "==", "!=", "<=", "<", ">=", ">", "="]
+getOperatorByPriority :: Int -> [String]
+getOperatorByPriority 0 = ["="]
+getOperatorByPriority 1 = ["||"]
+getOperatorByPriority 2 = ["&&"]
+getOperatorByPriority 3 = ["|"]
+getOperatorByPriority 4 = ["^"]
+getOperatorByPriority 5 = ["&"]
+getOperatorByPriority 6 = ["==", "!="]
+getOperatorByPriority 7 = ["<=", "<", ">=", ">"]
+getOperatorByPriority 8 = [">>", "<<"]
+getOperatorByPriority 9 = ["+", "-"]
+getOperatorByPriority 10 = ["*", "/", "%"]
+getOperatorByPriority 11 = ["**"]
+getOperatorByPriority _ = []
+
+parseBinOp :: Int -> Parser BinaryOp
+parseBinOp priority = do
+    test <- many parseSoftSeparator *> (parseString $ getOperatorByPriority priority)
     case test of
         "+" -> return Add
         "-" -> return Sub
@@ -163,7 +181,16 @@ parseBinOp = do
         ">=" -> return Gte
         "<" -> return Lt
         "<=" -> return Lte
+        "&&" -> return BAnd
+        "||" -> return BOr
         "=" -> return Asg
+
+parseBinExpr :: Int -> Parser Expression
+parseBinExpr priority
+    | priority < 12 = do
+        expr <- parseBinExpr (priority + 1)
+        (Expr expr <$> (parseBinOp priority <* many parseSoftSeparator) <*> parseBinExpr priority) <|> pure expr
+    | otherwise = parseUnary <|> (parseChar "(" *> parseBinExpr 0  <* many parseWhiteSpace <* parseChar ")")
 
 parseUnOp :: Parser UnaryOp
 parseUnOp = do
@@ -175,16 +202,13 @@ parseUnOp = do
         "~" -> return BinNot
 
 parseName :: Parser String
-parseName = (((:) <$> parseAlpha <*> many parseAlphaNum) <* many parseWhiteSpace)
-
-parseBinExpr :: Parser Expression
-parseBinExpr = Expr <$> (many parseWhiteSpace *> parseUnary <* many parseWhiteSpace) <*> (parseBinOp <* many parseWhiteSpace) <*> parseExpression
+parseName = ((:) <$> parseAlpha <*> many parseAlphaNum)
 
 parseArgument :: Parser (String, Type)
 parseArgument = (,) <$> ((:) <$> parseAlpha <*> many parseAlphaNum) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
 
 parseFunctionPrototype :: Parser FunctionPrototype
-parseFunctionPrototype = Proto <$> parseName <*> (parseChar "(" *> many parseWhiteSpace *> many (parseArgument <* many parseWhiteSpace) <* parseChar ")") <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+parseFunctionPrototype = Proto <$> (parseName <* many parseSoftSeparator) <*> (parseChar "(" *> many parseWhiteSpace *> many (parseArgument <* many parseWhiteSpace) <* parseChar ")") <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
 
 parseFunctionDeclaration :: Parser FunctionDeclaration
 parseFunctionDeclaration = Decl <$> (parseCharSequence "def" *> many parseWhiteSpace *> parseFunctionPrototype <* many parseWhiteSpace) <*> (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
@@ -193,7 +217,7 @@ parseFunction :: Parser Expression
 parseFunction = Fct <$> parseFunctionDeclaration
 
 parseFunctionCall :: Parser Value
-parseFunctionCall = GlobCall <$> parseName <*> (parseChar "(" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* parseChar ")")
+parseFunctionCall = GlobCall <$> (parseName <* many parseSoftSeparator) <*> (parseChar "(" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* parseChar ")")
 
 parseIf :: Parser Expression
 parseIf = IfExpr <$>
@@ -206,11 +230,11 @@ parseWhile = WhileExpr <$>
     (parseCharSequence "while" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
-parseExpression :: Parser Expression
-parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr <|> Un <$> parseUnary
+parseUnary :: Parser Expression
+parseUnary = Unary <$> many (many parseSoftSeparator *> parseUnOp) <*> (many parseSoftSeparator *> parseLiteral)
 
-parseUnary :: Parser Unary
-parseUnary = Unary <$> many (many parseWhiteSpace *> parseUnOp) <*> (many parseWhiteSpace *> parseLiteral)
+parseExpression :: Parser Expression
+parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr 0
 
 parseLiteral :: Parser Value
 parseLiteral = parseFunctionCall <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier

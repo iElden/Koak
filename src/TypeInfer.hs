@@ -53,22 +53,22 @@ findVarType ((varName, var):scope) name
     | otherwise = findVarType scope name
 
 checkExpression :: Scope -> Expression -> (([Message], Maybe Expression), Scope)
-checkExpression scope val@(Un (Unary ops (GlobVar v))) = case findVarType scope v of
+checkExpression scope val@(Unary ops (GlobVar v)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
-    Just t -> (([], Just $ Un $ Unary ops t), scope)
-checkExpression scope val@(Un (Unary ops var@(Var _ v _))) = case findVarType scope v of
+    Just t -> (([], Just $ Unary ops t), scope)
+checkExpression scope val@(Unary ops var@(Var _ v _)) = case findVarType scope v of
     Nothing -> (([], Just val), (v, var):scope)
     Just t2 -> (([
         Error $ "Variable " ++ v ++ " was previously defined",
         Info $ "-> " ++ show t2,
         getExpr val
         ], Nothing), scope)
-checkExpression scope val@(Un (Unary ops (GlobCall v args))) = case findVarType scope v of
+checkExpression scope val@(Unary ops (GlobCall v args)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
     Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
         True -> case inferTypes scope args of
             (msgs, Nothing) -> ((msgs, Nothing), scope)
-            (msgs, Just va) -> ((msgs, Just $ Un $ (Unary ops $ Call proto va)), scope)
+            (msgs, Just va) -> ((msgs, Just $ Unary ops $ Call proto va), scope)
         False -> (([Error $ "Not enough arguments for function " ++ show proto, getExpr val], Nothing), scope)
     Just t -> (([Error $ "Cannot call " ++ show t, getExpr val], Nothing), scope)
 
@@ -109,35 +109,11 @@ checkExpression scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVa
             arr -> (([Error "Shadow is prohibited", Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), (name, Var Global name $ Function proto):scope)
     Just t -> (([Error $ "Variable " ++ name ++ " already defined with type " ++ show t, Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), scope)
 
-checkExpression scope val@(Expr (Unary ops (GlobVar v)) op expr) = case findVarType scope v of
-    Nothing -> case checkExpression scope expr of
-        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
-    Just t -> case checkExpression scope expr of
-        result@((_, Nothing), end) -> result
-        ((msgs, Just ex), newScope) -> ((msgs, Just $ Expr (Unary ops t) op ex), newScope)
-checkExpression scope val@(Expr un@(Unary ops (Var _ v t)) op expr) = case findVarType scope v of
-    Nothing ->  case checkExpression scope expr of
-        result@((_, Nothing), _) -> result
-        ((msgs, Just ex), newScope) -> ((msgs, Just (Expr un op ex)), newScope)
-    Just t2 -> (([
-        Error $ "Variable " ++ v ++ " was previously defined",
-        Info $ "-> " ++ show t2,
-        getExpr val
-        ], Nothing), scope)
-checkExpression scope val@(Expr (Unary ops (GlobCall v args)) op expr) = case findVarType scope v of
-    Nothing -> case checkExpression scope expr of
-        ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
-    Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
-        True -> case inferTypes scope args of
-            (msgs, Nothing) -> ((msgs, Nothing), scope)
-            (msgs, Just ex) -> case checkExpression scope $ Expr (Unary ops $ Call proto ex) op expr of
-                ((msg, Nothing), newScope) -> ((msgs ++ msg, Nothing), newScope)
-                va -> va
-        False -> (([Error $ "Not enough arguments for function " ++ show proto, getExpr val], Nothing), scope)
-    Just t -> (([Error $ "Cannot call " ++ v ++ ": " ++ show t, getExpr val], Nothing), scope)
-checkExpression scope val@(Expr p1 op expr) = case checkExpression scope expr of
+checkExpression scope val@(Expr ex1 op ex2) = case checkExpression scope ex1 of
     result@((_, Nothing), _) -> result
-    ((msgs, Just ex), newScope) -> ((msgs, Just (Expr p1 op ex)), newScope)
+    ((msgs, Just exp1), newScope1) -> case checkExpression newScope1 ex2 of
+        result@((_, Nothing), _) -> result
+        ((msgs, Just exp2), newScope2) -> ((msgs, Just (Expr exp1 op exp2)), newScope2)
 
 checkExpression scope e = (([], Just e), scope)
 
