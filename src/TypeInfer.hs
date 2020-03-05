@@ -104,6 +104,8 @@ checkExpression scope expr@(Cast t ex) = case checkExpression scope ex of
     ((msgs, Just x), newScope) -> ((msgs, Just $ Cast t x), newScope)
     va -> va
 
+checkExpression scope expr@(Extern name t) = (([], Just expr), (name, (Var Global name t)):scope)
+
 checkExpression scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
     Nothing ->
         case filter ((/=) Nothing) $ fmap (\(s, t) -> findVarType scope s) args of
