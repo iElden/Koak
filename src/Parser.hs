@@ -189,7 +189,7 @@ parseBinExpr :: Int -> Parser Expression
 parseBinExpr priority
     | priority < 12 = do
         expr <- parseBinExpr (priority + 1)
-        (Expr expr <$> (parseBinOp priority <* many parseSoftSeparator) <*> parseExpression) <|> pure expr
+        (Expr expr <$> (parseBinOp priority <* many parseSoftSeparator) <*> parseBinExpr priority) <|> pure expr
     | otherwise = parseUnary <|> (parseChar "(" *> parseBinExpr 0  <* many parseWhiteSpace <* parseChar ")")
 
 parseUnOp :: Parser UnaryOp
