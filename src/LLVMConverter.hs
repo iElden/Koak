@@ -16,6 +16,7 @@ import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.ParameterAttribute as PA
 import qualified LLVM.AST.Instruction as Ins
 import qualified LLVM.AST.FloatingPointPredicate as FPP
+import qualified LLVM.AST.AddrSpace as Addr
 
 import Data.String
 import LLVM.IRBuilder.Module
@@ -34,7 +35,8 @@ type VarName = String
 type LocalVariables = [(ASTL.Type, VarName, Maybe Operand)]
 
 lookupVariable :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m Operand
-lookupVariable n [] = return $ ConstantOperand $ C.GlobalReference floatType (fromString n)
+lookupVariable n [] = do
+    load (ConstantOperand $ C.GlobalReference (PointerType floatType $ Addr.AddrSpace 0) (fromString n)) 0
 lookupVariable n ((t, name, op):xs)
     | n == name = case op of
         Just operand -> return operand
@@ -141,6 +143,7 @@ convertExpression (Un (Unary [] val)) vars = do
 convertExpression (Fct (Decl proto expr)) vars = do
     op <- convertFunction proto expr
     return (op, vars)
+convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Expr (Unary [] val) AST.Add expr) vars = do
     leftOp <- convertValue val vars
     (rightOp, locs) <- convertExpression expr vars
@@ -161,10 +164,10 @@ convertExpression (Expr (Unary [] val) AST.Equ expr) vars = do
     leftOp <- convertValue val vars
     (rightOp, locs) <- convertExpression expr vars
     fmap (\s -> (s, locs)) $ fcmp FPP.UEQ leftOp rightOp
-convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression ex@(IfExpr expr thenExpr elseExpr) vars = do
     op <- convertIfExpr ex vars
     return (op, vars)
+
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
