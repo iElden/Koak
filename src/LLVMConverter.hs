@@ -34,7 +34,7 @@ floatType = FloatingPointType DoubleFP
 -- lookups in variable
 type VarName = String
 type LocalVariables = [(ASTL.Type, VarName, Maybe Operand)]
-type GlobalVariables = [(ASTL.Type, VarName)]
+type GlobalVariables = [(ASTL.Type, VarName, Operand)]
 type CurrentVariables = (GlobalVariables, LocalVariables)
 
 lookupVariable :: MonadModuleBuilder m => String -> CurrentVariables -> IRBuilderT m Operand
@@ -45,6 +45,13 @@ lookupVariable n (gv ,((t, name, op):xs))
         Just operand -> return operand
         Nothing -> return $ LocalReference t (fromString n)
     | otherwise = lookupVariable n (gv, xs)
+
+isGlobalExisting :: MonadModuleBuilder m => String -> GlobalVariables -> IRBuilderT m (Maybe Operand)
+isGlobalExisting n [] = return Nothing
+isGlobalExisting n ((t, name, op):xs)
+    | n == name = return (Just op)
+    | otherwise = isGlobalExisting n xs
+
 
 
 getParamsValueInLLVM :: MonadModuleBuilder m => [Expression] -> CurrentVariables -> IRBuilderT m [(Operand, [PA.ParameterAttribute])]
@@ -129,13 +136,21 @@ convertFunction (Proto name args retType) exprs gv = do
 
 convertVariable :: MonadModuleBuilder m => Value -> Expression -> CurrentVariables -> IRBuilderT m (Operand, CurrentVariables)
 convertVariable (Var Global n t) expr vars = do
-    (res, _) <- convertExpression expr vars
-    case res of
-        (ConstantOperand cons) -> do
-            op <- global (fromString n) floatType cons
+    (res, (gv, lv)) <- convertExpression expr vars
+    sol <- isGlobalExisting n gv
+    case sol of
+        Just op -> do
             store res 0 op
-            return (op, vars)
-        _ -> fmap (\s -> (s, vars)) $ global (fromString n) floatType $ (C.Float $ F.Double 0.0)
+            return (op, (gv, lv))
+        Nothing -> case res of
+            (ConstantOperand cons) -> do
+                op <- global (fromString n) floatType cons
+                store res 0 op
+                return (op, ([(getASTLType t, n, op)] ++ gv, lv))
+            _ -> do
+                op <- global (fromString n) floatType $ C.Float $ F.Double 0
+                store res 0 op
+                return (op, ([(getASTLType t, n, op)] ++ gv, lv))
 convertVariable (Var Local n t) expr vars = do
     (res, (gv, lv)) <- convertExpression expr vars
     case res of
