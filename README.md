@@ -108,3 +108,8 @@ You can loop using the `while` keyword
             i = i << 1
         }
     }
+
+
+## Link the output file
+
+    gcc koak_output_file.o other_koak_output_file.o -lm
