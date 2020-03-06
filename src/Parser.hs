@@ -29,50 +29,54 @@ import Text.Read
 import Data.Maybe
 import Control.Applicative
 
-data Parser a = Parse (String -> Maybe (a, String))
+data Parser a = Parse (String -> (Maybe a, String))
 
 instance Functor Parser where
     fmap f (Parse parser) = Parse (\str -> do
-        (val, remain) <- parser str
-        return (f val, remain))
+        case parser str of
+            (Nothing, remain) -> (Nothing, remain)
+            (Just val, remain) -> (Just $ f val, remain))
 
 instance Applicative Parser where
-    pure a = Parse (\s -> Just (a, s))
+    pure a = Parse (\s -> (Just a, s))
     (<*>) (Parse p1) p2 = Parse (\s -> do
-        (f, remain) <- p1 s
-        (v, remain2) <- runParser p2 remain
-        return (f v, remain2))
+        case p1 s of
+            (Nothing, remain) -> (Nothing, remain)
+            (Just f, remain) -> case runParser p2 remain of
+                (Nothing, remain2) -> (Nothing, remain2)
+                (Just v, remain2) -> (Just $ f v, remain2))
 
 instance Monad Parser where
     (>>=) (Parse v) f = Parse (\s -> do
-        (a, remain) <- v s
-        runParser (f a) remain)
+        case v s of
+            (Nothing, remain) -> (Nothing, remain)
+            (Just a, remain) -> runParser (f a) remain)
 
 instance Alternative Parser where
-    empty = Parse (\_ -> Nothing)
+    empty = Parse (\s -> (Nothing, s))
     (<|>) (Parse p1) (Parse p2) = Parse (\s -> do
         case p1 s of
-            Just v -> return v
-            Nothing -> p2 s)
+            (Just v, remain) -> (Just v, remain)
+            (Nothing, _) -> p2 s)
 
-runParser :: Parser a -> String -> Maybe (a, String)
+runParser :: Parser a -> String -> (Maybe a, String)
 runParser (Parse f) s = f s
 
 parseChar :: String -> Parser Char
 parseChar list = Parse $ parse list
     where
-        parse _ "" = Nothing
+        parse _ "" = (Nothing, "")
         parse list (c:str)
-            | elem c list = return (c, str)
-            | otherwise = Nothing
+            | elem c list = (Just c, str)
+            | otherwise = (Nothing, c:str)
 
 parseCharBlackList :: String -> Parser Char
 parseCharBlackList list = Parse $ parse list
     where
-        parse _ "" = Nothing
+        parse _ "" = (Nothing, "")
         parse list (c:str)
-            | elem c list = Nothing
-            | otherwise = return (c, str)
+            | elem c list = (Nothing, c:str)
+            | otherwise = (Just c, str)
 
 parseCharSequence :: String -> Parser String
 parseCharSequence "" = pure ""
@@ -87,8 +91,8 @@ parseDigit = parseChar ['0'..'9']
 
 parseEOF :: Parser ()
 parseEOF = Parse $ \s -> case s of
-    "" -> return ((), s)
-    _ -> Nothing
+    "" -> (Just (), s)
+    v -> (Nothing, v)
 
 parseAlpha :: Parser Char
 parseAlpha = parseChar $ ['a'..'z'] ++ ['A'..'Z']
@@ -211,7 +215,7 @@ parseFunctionPrototype :: Parser FunctionPrototype
 parseFunctionPrototype = Proto <$> (parseName <* many parseSoftSeparator) <*> (parseChar "(" *> many parseWhiteSpace *> many (parseArgument <* many parseWhiteSpace) <* parseChar ")") <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
 
 parseFunctionDeclaration :: Parser FunctionDeclaration
-parseFunctionDeclaration = Decl <$> (parseCharSequence "def" *> many parseWhiteSpace *> parseFunctionPrototype <* many parseWhiteSpace) <*> (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+parseFunctionDeclaration = Decl <$> (parseCharSequence "def" *> many parseWhiteSpace *> parseFunctionPrototype <* many parseWhiteSpace) <*> (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* some parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
 parseFunction :: Parser Expression
 parseFunction = Fct <$> parseFunctionDeclaration
@@ -223,12 +227,12 @@ parseIf :: Parser Expression
 parseIf = IfExpr <$>
     (parseCharSequence "if" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}") <*>
-    optional (many parseWhiteSpace *> parseCharSequence "else" *> many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+    optional (many parseWhiteSpace *> parseCharSequence "else" *> many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* some parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
 parseWhile :: Parser Expression
 parseWhile = WhileExpr <$>
     (parseCharSequence "while" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
-    (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* many parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
+    (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* some parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
 parseUnary :: Parser Expression
 parseUnary = Unary <$> many (many parseSoftSeparator *> parseUnOp) <*> (many parseSoftSeparator *> parseLiteral)
