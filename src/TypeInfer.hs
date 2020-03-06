@@ -8,7 +8,8 @@ module TypeInfer (
     noEffect,
     isCastValid,
     findVarType,
-    checkExpression
+    checkExpression,
+    checkExpressionsType
     ) where
 
 import AST
@@ -42,15 +43,89 @@ noEffect :: Expression -> [Message]
 noEffect e = [Warning "This statement has no effect", getExpr e]
 
 isCastValid :: Type -> Type -> Bool
+isCastValid IntegerVar BooleanVar = True
 isCastValid IntegerVar FloatingVar = True
 isCastValid FloatingVar IntegerVar = True
+isCastValid _ Void = True
 isCastValid a b = a == b
+
+isOpValid :: BinaryOp -> Type -> Type -> Bool
+isOpValid And IntegerVar IntegerVar = True
+isOpValid Or  IntegerVar IntegerVar = True
+isOpValid Xor IntegerVar IntegerVar = True
+isOpValid RSh IntegerVar IntegerVar = True
+isOpValid LSh IntegerVar IntegerVar = True
+isOpValid And _ _ = False
+isOpValid Or  _ _ = False
+isOpValid Xor _ _ = False
+isOpValid RSh _ _ = False
+isOpValid LSh _ _ = False
+isOpValid _ (UnknownType _) (UnknownType _) = False
+isOpValid _ t1 t2 = t1 == t2
+
+getOpType :: BinaryOp -> Type -> Type -> Type
+getOpType BAnd _ _ = BooleanVar
+getOpType BOr  _ _ = BooleanVar
+getOpType Equ  _ _ = BooleanVar
+getOpType Neq  _ _ = BooleanVar
+getOpType Gt   _ _ = BooleanVar
+getOpType Gte  _ _ = BooleanVar
+getOpType Lt   _ _ = BooleanVar
+getOpType Lte  _ _ = BooleanVar
+getOpType _ t _ = t
 
 findVarType :: Scope -> String -> Maybe Value
 findVarType [] _ = Nothing
 findVarType ((varName, var):scope) name
     | name == varName = return var
     | otherwise = findVarType scope name
+
+getExpressionType :: Expression -> ([Message], Maybe Type)
+getExpressionType (Unary _ (Nbr n))                     = ([], Just IntegerVar)
+getExpressionType (Unary _ (RealNbr n))                 = ([], Just FloatingVar)
+getExpressionType (Unary _ (Var _ _ t))                 = ([], Just t)
+getExpressionType (Unary _ (Call (Proto _ _ retType) _))= ([], Just retType)
+getExpressionType (IfExpr cond ifExprs Nothing)         = case checkExpressionsType ifExprs of
+    (msgs, Nothing)-> (msgs, Nothing)
+    (msgs, _)      -> case getExpressionType cond of
+        (msgs2, Just BooleanVar)-> (msgs ++ msgs2, Just Void)
+        (msgs2, Nothing)        -> (msgs ++ msgs2, Nothing)
+        (msgs2, Just t)         -> (msgs ++ msgs2 ++ [Error $ "Couldn't match expected type bool with actual type " ++ show t, getExpr cond], Nothing)
+getExpressionType (IfExpr cond ifExprs (Just elseExprs))= case checkExpressionsType ifExprs of
+    (msgs, Nothing)-> (msgs, Nothing)
+    (msgs, _)      -> case checkExpressionsType elseExprs of
+        (msgs, Nothing)-> (msgs, Nothing)
+        (msgs2, _)     -> case getExpressionType cond of
+            (msgs3, Just BooleanVar)-> (msgs ++ msgs2 ++ msgs3, Just Void)
+            (msgs3, Nothing)        -> (msgs ++ msgs2 ++ msgs3, Nothing)
+            (msgs3, Just t)         -> (msgs ++ msgs2 ++ msgs3 ++ [Error $ "Couldn't match expected type bool with actual type " ++ show t, getExpr cond], Nothing)
+getExpressionType (WhileExpr cond whileExprs)           = case checkExpressionsType whileExprs of
+    (msgs, Nothing)-> (msgs, Nothing)
+    (msgs, _)      -> case getExpressionType cond of
+        (msgs2, Just BooleanVar)-> (msgs ++ msgs2, Just Void)
+        (msgs2, Nothing)        -> (msgs ++ msgs2, Nothing)
+        (msgs2, Just t)         -> (msgs ++ msgs2 ++ [Error $ "Couldn't match expected type bool with actual type " ++ show t, getExpr cond], Nothing)
+getExpressionType v@(Expr expr1 op expr2)                = case getExpressionType expr1 of
+    (msgs, Nothing) -> (msgs, Nothing)
+    (msgs, Just t1) -> case getExpressionType expr2 of
+        (msgs2, Nothing) -> (msgs ++ msgs2, Nothing)
+        (msgs2, Just t2) ->
+            if isOpValid op t1 t2 then
+                (msgs ++ msgs2, Just $ getOpType op t1 t2)
+            else
+                (msgs ++ msgs2 ++ [Error $ "Invalid operand '" ++ show op ++ "' between " ++ show t1 ++ " and " ++ show t2, getExpr v], Nothing)
+
+getExpressionType (Fct fct)                             = ([], Just Void)
+getExpressionType (Cast t _)                            = ([], Just t)
+getExpressionType (Extern name t)                       = ([], Just Void)
+getExpressionType expr@(Unary _ (GlobVar n))            = ([Error $ "Cannot get type of " ++ show expr, getExpr expr], Nothing)
+getExpressionType expr@(Unary _ (GlobCall n args))      = ([Error $ "Cannot get type of " ++ show expr, getExpr expr], Nothing)
+getExpressionType _                                     = ([Error "Not implemented"], Nothing)
+
+checkExpressionsType :: [Expression] -> ([Message], Maybe [Expression])
+checkExpressionsType exprs = case fmap sequence_ $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
+    (msgs, Nothing) -> (msgs, Nothing)
+    (msgs, _) -> (msgs, Just exprs)
 
 checkExpression :: Scope -> Expression -> (([Message], Maybe Expression), Scope)
 checkExpression scope val@(Unary ops (GlobVar v)) = case findVarType scope v of

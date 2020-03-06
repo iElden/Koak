@@ -20,6 +20,7 @@ dispList sep list = intercalate sep $ fmap show list
 data Type =
     Void |
     IntegerVar |
+    BooleanVar |
     FloatingVar |
     UnknownType String |
     Function FunctionPrototype
@@ -102,6 +103,7 @@ instance Show VarScope where
 
 data Value =
     Nbr Int |
+    Boolean Bool |
     RealNbr Double |
     GlobVar String |
     Var VarScope String Type |
@@ -113,6 +115,8 @@ instance Show Value where
     show (Nbr n) = show n
     show (RealNbr n) = show n
     show (GlobVar n) = '@':n
+    show (Boolean True) = "true"
+    show (Boolean False) = "false"
     show (Var scope n t) = show scope ++ " " ++ n ++ ": " ++ show t
     show (GlobCall n args) = '@':n ++ "(" ++ dispList " " args ++ ")"
     show (Call (Proto name _ _) args) = name ++ "(" ++ dispList " " args ++ ")"
@@ -135,8 +139,6 @@ instance Show FunctionDeclaration where
 
 
 data Expression =
-    ExtVar (String, Type) |
-    ExtFct FunctionPrototype |
     Fct FunctionDeclaration |
     Expr Expression BinaryOp Expression |
     IfExpr Expression [Expression] (Maybe [Expression]) |
@@ -152,8 +154,6 @@ instance Show Expression where
     show (WhileExpr cond whileExprs) = "while (" ++ show cond ++ ") {\n" ++ dispList "\n" whileExprs ++ "\n}"
     show (Expr unary op expr) = "(" ++ show unary ++ ") " ++ show op ++ " (" ++ show expr ++ ")"
     show (Fct fct) = show fct
-    show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
-    show (ExtFct val) = "extern " ++ show val
     show (Unary ops v) = dispList "" ops ++ show v
     show (Cast t e) = "cast<" ++ show t ++ ">(" ++ show e ++ ")"
-    show (Extern name t ) = "extern " ++ name ++ ": " ++ show t
+    show (Extern name t) = "extern " ++ name ++ ": " ++ show t

@@ -28,16 +28,28 @@ parseFiles [x] =  do
     f <- Prelude.readFile x
     case runParser parseFile f of
         (Nothing, v) -> Prelude.putStrLn $ x ++ ": Parsing error near '" ++ take 50 v ++ "'"
-        (Just v, _) -> displayTypeResult x $ inferTypes [] v
+        (Just v, _) -> displayTypeResult x True $ inferTypes [] v
     where
-        displayTypeResult :: String -> ([Message], Maybe [Expression]) -> IO ()
-        displayTypeResult x (msgs, Just exprs) = do
+        displayTypeResult :: String -> Bool-> ([Message], Maybe [Expression]) -> IO ()
+        displayTypeResult x True (msgs, Just exprs) = do
+            Prelude.putStrLn $ "//File " ++ x
             displayMsgs msgs
-            Prelude.putStrLn (intercalate "\n" $ fmap show exprs)
+            displayMsgs exprs
+            displayLLVMResult x $ checkExpressionsType exprs
+        displayTypeResult x False (msgs, Just exprs) = do
+            Prelude.putStrLn $ "//File " ++ x
+            displayMsgs msgs
+            displayLLVMResult x $ checkExpressionsType exprs
+        displayTypeResult x _ (msgs, _) = displayMsgs msgs
+
+        displayLLVMResult :: String -> ([Message], Maybe [Expression]) -> IO ()
+        displayLLVMResult x (msgs, Just exprs) = do
+            displayMsgs msgs
             T.putStrLn $ ppllvm $ makeASTModule x exprs
-        displayTypeResult x (msgs, _) = displayMsgs msgs
-        displayMsgs :: [Message] -> IO ()
-        displayMsgs msgs = Prelude.putStrLn ("//File " ++ x ++ "\n" ++ (intercalate "\n" $ fmap show msgs))
+        displayLLVMResult x (msgs, Nothing) = displayMsgs msgs
+
+        displayMsgs :: Show a => [a] -> IO ()
+        displayMsgs msgs = Prelude.putStrLn $ intercalate "\n" $ fmap show msgs
 parseFiles (x:xs) = do
     parseFiles [x] >> parseFiles xs
 

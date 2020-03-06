@@ -14,7 +14,7 @@ def test(var1: int var2: double): double {
     (2 + a) * a
 }
 
-global x: double = 0
+global x: double = 0.
 
 if (x == 1.0) {
     x = test(1 2)

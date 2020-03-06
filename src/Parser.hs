@@ -6,6 +6,7 @@ module Parser(
     parseCharSequence,
     parseInteger,
     parseDouble,
+    parseBoolean,
     parseLiteral,
     parseIdentifier,
     parseExpression,
@@ -111,6 +112,10 @@ parseInteger = do
     intPart <- (readMaybe :: String -> Maybe Int) <$> many parseDigit
     maybe empty (pure . Nbr) intPart
 
+parseBoolean :: Parser Value
+parseBoolean = do
+    val <- parseString ["true", "false"]
+    return $ Boolean $ val == "true"
 parseDouble :: Parser Value
 parseDouble = do
     nbr <- (readMaybe :: String -> Maybe Double) <$> do
@@ -133,6 +138,7 @@ parseBuiltinType = do
         "int" -> return IntegerVar
         "void" -> return Void
         "double" -> return FloatingVar
+        "bool" -> return BooleanVar
         "" -> empty
         _ -> return $ UnknownType t
 
@@ -247,7 +253,7 @@ parseExpression :: Parser Expression
 parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseCast <|> parseExtern <|> parseBinExpr 0
 
 parseLiteral :: Parser Value
-parseLiteral = parseFunctionCall <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
+parseLiteral = parseFunctionCall <|> parseBoolean <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
 
 parseFile :: Parser [Expression]
 parseFile = many parseWhiteSpace *> ((:) <$> parseExpression <*> many (some parseWhiteSpace *> parseExpression)) <* many parseWhiteSpace <* parseEOF
