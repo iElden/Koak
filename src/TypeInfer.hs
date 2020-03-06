@@ -192,6 +192,7 @@ checkExpression inFct scope expr@(Cast t ex) = case checkExpression inFct scope 
     ((msgs, Just x), newScope) -> ((msgs, Just $ Cast t x), newScope)
     va -> va
 
+checkExpression _ scope expr@(Extern name (Function (Proto _ args retType))) = (([], Just expr), (name, (Var Global name (Function (Proto name args retType)))):scope)
 checkExpression _ scope expr@(Extern name t) = (([], Just expr), (name, (Var Global name t)):scope)
 
 checkExpression _ scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of

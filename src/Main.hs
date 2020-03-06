@@ -28,19 +28,21 @@ parseFiles [x] =  do
     f <- Prelude.readFile x
     case runParser parseFile f of
         (Nothing, v) -> Prelude.putStrLn $ x ++ ": Parsing error near '" ++ take 50 v ++ "'"
-        (Just v, _) -> displayTypeResult x True $ inferTypes False [] v
+        (Just v, _) -> displayTypeResult x True v $ inferTypes False [] v
     where
-        displayTypeResult :: String -> Bool-> ([Message], Maybe [Expression]) -> IO ()
-        displayTypeResult x True (msgs, Just exprs) = do
+        displayTypeResult :: String -> Bool -> [Expression] -> ([Message], Maybe [Expression]) -> IO ()
+        displayTypeResult x True ex (msgs, Just exprs) = do
             Prelude.putStrLn $ "//File " ++ x
+            displayMsgs ex
             displayMsgs msgs
             displayMsgs exprs
             displayLLVMResult x $ checkExpressionsType exprs
-        displayTypeResult x False (msgs, Just exprs) = do
+        displayTypeResult x False _ (msgs, Just exprs) = do
             Prelude.putStrLn $ "//File " ++ x
             displayMsgs msgs
             displayLLVMResult x $ checkExpressionsType exprs
-        displayTypeResult x _ (msgs, _) = displayMsgs msgs
+        displayTypeResult x True ex (msgs, _) = displayMsgs ex >> displayMsgs msgs
+        displayTypeResult x False _ (msgs, _) = displayMsgs msgs
 
         displayLLVMResult :: String -> ([Message], Maybe [Expression]) -> IO ()
         displayLLVMResult x (msgs, Just exprs) = do

@@ -27,6 +27,7 @@ module Parser(
 
 import AST
 import Text.Read
+import Data.Char
 import Data.Maybe
 import Control.Applicative
 
@@ -108,7 +109,7 @@ parseWhiteSpace :: Parser Char
 parseWhiteSpace = parseSoftSeparator <|> parseChar "\n"
 
 parseInteger :: Parser Value
-parseInteger = do
+parseInteger = (Nbr <$> ord <$> (parseChar "'" *> parseCharBlackList [] <* parseChar "'")) <|> do
     intPart <- (readMaybe :: String -> Maybe Int) <$> many parseDigit
     maybe empty (pure . Nbr) intPart
 

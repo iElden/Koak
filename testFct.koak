@@ -4,7 +4,7 @@ extern test4 : (a: int): double
 extern test5 : (a: int): double
 
 def test2() : int {
-    1
+    'A'
 }
 
 test3
