@@ -88,7 +88,7 @@ Unary - : `-a`
 You can write a condition using the `if` keyword
 
     def is_odd(x: int): bool {
-    local result : bool = false
+        local result : bool = false
         if (x % 2 == 0) {
             result = false
         }
