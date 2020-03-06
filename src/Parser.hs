@@ -234,11 +234,17 @@ parseWhile = WhileExpr <$>
     (parseCharSequence "while" *> many parseWhiteSpace *> parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")") <*>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* some parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
+parseCast :: Parser Expression
+parseCast = Cast <$> (parseCharSequence "cast<" *> parseType <* parseCharSequence ">") <*> (parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")")
+
+parseExtern :: Parser Expression
+parseExtern = Extern <$> (parseCharSequence "extern" *> many parseWhiteSpace *> ((:) <$> parseAlpha <*> many parseAlphaNum)) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)
+
 parseUnary :: Parser Expression
 parseUnary = Unary <$> many (many parseSoftSeparator *> parseUnOp) <*> (many parseSoftSeparator *> parseLiteral)
 
 parseExpression :: Parser Expression
-parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseBinExpr 0
+parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseCast <|> parseExtern <|> parseBinExpr 0
 
 parseLiteral :: Parser Value
 parseLiteral = parseFunctionCall <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier

@@ -141,7 +141,9 @@ data Expression =
     Expr Expression BinaryOp Expression |
     IfExpr Expression [Expression] (Maybe [Expression]) |
     WhileExpr Expression [Expression] |
-    Unary [UnaryOp] Value
+    Unary [UnaryOp] Value |
+    Cast Type Expression |
+    Extern String Type
     deriving Eq
 
 instance Show Expression where
@@ -153,3 +155,5 @@ instance Show Expression where
     show (ExtVar (name, t)) = "extern " ++ name ++ ": " ++ show t
     show (ExtFct val) = "extern " ++ show val
     show (Unary ops v) = dispList "" ops ++ show v
+    show (Cast t e) = "cast<" ++ show t ++ ">(" ++ show e ++ ")"
+    show (Extern name t ) = "extern " ++ name ++ ": " ++ show t
