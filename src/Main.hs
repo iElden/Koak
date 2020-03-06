@@ -28,7 +28,7 @@ parseFiles [x] =  do
     f <- Prelude.readFile x
     case runParser parseFile f of
         (Nothing, v) -> Prelude.putStrLn $ x ++ ": Parsing error near '" ++ take 50 v ++ "'"
-        (Just v, _) -> displayTypeResult x True $ inferTypes [] v
+        (Just v, _) -> displayTypeResult x True $ inferTypes False [] v
     where
         displayTypeResult :: String -> Bool-> ([Message], Maybe [Expression]) -> IO ()
         displayTypeResult x True (msgs, Just exprs) = do

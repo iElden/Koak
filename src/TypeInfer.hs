@@ -127,82 +127,85 @@ checkExpressionsType exprs = case fmap sequence_ $ foldl (\(a, b)(c, d) -> (a ++
     (msgs, Nothing) -> (msgs, Nothing)
     (msgs, _) -> (msgs, Just exprs)
 
-checkExpression :: Scope -> Expression -> (([Message], Maybe Expression), Scope)
-checkExpression scope val@(Unary ops (GlobVar v)) = case findVarType scope v of
+checkExpression :: Bool -> Scope -> Expression -> (([Message], Maybe Expression), Scope)
+checkExpression _ scope val@(Unary ops (GlobVar v)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
     Just t -> (([], Just $ Unary ops t), scope)
-checkExpression scope val@(Unary ops var@(Var _ v _)) = case findVarType scope v of
+checkExpression True scope expr@(Unary ops (Var Global _ _)) = (([Error "Global declaration is only allowed in main chunk", getExpr expr], Nothing), scope)
+checkExpression _ scope val@(Unary ops var@(Var _ v _)) = case findVarType scope v of
     Nothing -> (([], Just val), (v, var):scope)
     Just t2 -> (([
         Error $ "Variable " ++ v ++ " was previously defined",
         Info $ "-> " ++ show t2,
         getExpr val
         ], Nothing), scope)
-checkExpression scope val@(Unary ops (GlobCall v args)) = case findVarType scope v of
+checkExpression inFct scope val@(Unary ops (GlobCall v args)) = case findVarType scope v of
     Nothing -> ((varNotFound v val, Nothing), scope)
     Just (Var _ _ (Function proto@(Proto _ argsType _))) -> case length argsType == length args of
-        True -> case inferTypes scope args of
+        True -> case inferTypes inFct scope args of
             (msgs, Nothing) -> ((msgs, Nothing), scope)
             (msgs, Just va) -> ((msgs, Just $ Unary ops $ Call proto va), scope)
         False -> (([Error $ "Not enough arguments for function " ++ show proto, getExpr val], Nothing), scope)
     Just t -> (([Error $ "Cannot call " ++ show t, getExpr val], Nothing), scope)
 
-checkExpression scope (IfExpr cond ifExprs Nothing) = case checkExpression scope cond of
+checkExpression inFct scope (IfExpr cond ifExprs Nothing) = case checkExpression inFct scope cond of
     expr@((_, Nothing), _) -> expr
-    ((msgs, Just econd), newScope) -> case inferTypes scope ifExprs of
+    ((msgs, Just econd), newScope) -> case inferTypes inFct scope ifExprs of
         (msgs, Nothing) -> ((msgs, Nothing), newScope)
         (msgs, Just expr) -> ((msgs, Just $ IfExpr econd expr Nothing), newScope)
-checkExpression scope (IfExpr cond ifExprs (Just elseExprs)) =  case checkExpression scope cond of
+checkExpression inFct scope (IfExpr cond ifExprs (Just elseExprs)) =  case checkExpression inFct scope cond of
     expr@((_, Nothing), _) -> expr
-    ((msgs, Just econd), newScope) -> case inferTypes scope ifExprs of
+    ((msgs, Just econd), newScope) -> case inferTypes inFct scope ifExprs of
         expr@(msgs, Nothing) -> ((msgs, Nothing), scope)
-        (msgs, Just expr) -> case inferTypes scope elseExprs of
+        (msgs, Just expr) -> case inferTypes inFct scope elseExprs of
              (ms, Nothing) -> ((msgs ++ ms, Nothing), scope)
              (ms, elseExpr) -> ((msgs ++ ms, Just $ IfExpr econd expr elseExpr), scope)
 
-checkExpression scope (WhileExpr cond ifExprs) = case checkExpression scope cond of
+checkExpression inFct scope (WhileExpr cond ifExprs) = case checkExpression inFct scope cond of
     expr@((_, Nothing), _) -> expr
-    ((msgs, Just econd), newScope) -> case inferTypes scope ifExprs of
+    ((msgs, Just econd), newScope) -> case inferTypes inFct scope ifExprs of
         (msgs, Nothing) -> ((msgs, Nothing), newScope)
         (msgs, Just expr) -> ((msgs, Just $ WhileExpr econd expr), newScope)
 
-checkExpression scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
-    Nothing -> case checkExpression scope expr of
+checkExpression inFct scope val@(Expr (Unary ops (GlobVar v)) Asg expr) = case findVarType scope v of
+    Nothing -> case checkExpression inFct scope expr of
         ((msgs, _), newScope) -> (((varNotFound v val) ++ msgs, Nothing), newScope)
-    Just t -> checkExpression scope $ Expr (Unary ops t) Asg expr
-checkExpression scope (Expr (Unary ops val@(Var _ v t)) Asg expr) = case checkExpression ((v, val):scope) expr of
+    Just t -> checkExpression inFct scope $ Expr (Unary ops t) Asg expr
+checkExpression True scope expr@(Expr (Unary ops val@(Var Global _ _)) Asg _) = (([Error "Global declaration is only allowed in main chunk", getExpr expr], Nothing), scope)
+
+checkExpression inFct scope (Expr (Unary ops val@(Var _ v t)) Asg expr) = case checkExpression inFct ((v, val):scope) expr of
     ((msgs, Just x), newScope) -> ((msgs, Just (Expr (Unary ops val) Asg x)), newScope)
     va -> va
-checkExpression scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
+checkExpression _ scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
-checkExpression scope expr@(Cast t ex) = case checkExpression scope ex of
+checkExpression inFct scope expr@(Cast t ex) = case checkExpression inFct scope ex of
     ((msgs, Just x), newScope) -> ((msgs, Just $ Cast t x), newScope)
     va -> va
 
-checkExpression scope expr@(Extern name t) = (([], Just expr), (name, (Var Global name t)):scope)
+checkExpression _ scope expr@(Extern name t) = (([], Just expr), (name, (Var Global name t)):scope)
 
-checkExpression scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
+checkExpression _ scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
     Nothing ->
         case filter ((/=) Nothing) $ fmap (\(s, t) -> findVarType scope s) args of
-            [] -> case inferTypes (scope ++ fmap (\(n, vt) -> (n, Var Local n vt)) args) exprs of
+            [] -> case inferTypes True (scope ++ fmap (\(n, vt) -> (n, Var Local n vt)) args) exprs of
                 (msgs, Nothing) -> ((msgs, Nothing), (name, Var Global name $ Function proto):scope)
                 (msgs, Just exs) -> ((msgs, Just (Fct (Decl proto exs))), (name, Var Global name $ Function proto):scope)
             arr -> (([Error "Shadow is prohibited", Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), (name, Var Global name $ Function proto):scope)
     Just t -> (([Error $ "Variable " ++ name ++ " already defined with type " ++ show t, Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), scope)
 
-checkExpression scope val@(Expr ex1 op ex2) = case checkExpression scope ex1 of
+checkExpression inFct scope val@(Expr ex1 op ex2) = case checkExpression inFct scope ex1 of
     result@((_, Nothing), _) -> result
-    ((msgs, Just exp1), newScope1) -> case checkExpression newScope1 ex2 of
+    ((msgs, Just exp1), newScope1) -> case checkExpression inFct newScope1 ex2 of
         result@((_, Nothing), _) -> result
         ((msgs, Just exp2), newScope2) -> ((msgs, Just (Expr exp1 op exp2)), newScope2)
 
-checkExpression scope e = (([], Just e), scope)
+checkExpression _ scope e = (([], Just e), scope)
 
-checkExpressions :: Scope -> [Expression] -> [([Message], Maybe Expression)]
-checkExpressions _ [] = []
-checkExpressions scope (x:xs) = case checkExpression scope x of
-    (val, newScope) -> val:(checkExpressions newScope xs)
+checkExpressions :: Bool -> Scope -> [Expression] -> [([Message], Maybe Expression)]
+checkExpressions _ _ [] = []
+checkExpressions inFct scope (x:xs) = case checkExpression inFct scope x of
+    (val, newScope) -> val:(checkExpressions inFct newScope xs)
 
-inferTypes :: Scope -> [Expression] -> ([Message], Maybe [Expression])
-inferTypes _ [] = ([Warning "Empty file given"], Just [])
-inferTypes scope exprs = fmap (sequence . reverse) $ foldl (\(a, b) (c, d) -> (a ++ c, d:b)) ([], []) $ checkExpressions scope exprs
+inferTypes :: Bool -> Scope -> [Expression] -> ([Message], Maybe [Expression])
+inferTypes _ _ [] = ([Warning "Empty file given"], Just [])
+inferTypes inFct scope exprs = fmap (sequence . reverse) $ foldl (\(a, b) (c, d) -> (a ++ c, d:b)) ([], []) $ checkExpressions inFct scope exprs

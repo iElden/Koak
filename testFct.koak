@@ -1,5 +1,4 @@
-<<<<<<< HEAD
-=======
+
 extern test3 : int
 extern test4 : (a: int): double
 extern test5 : (a: int): double
@@ -10,7 +9,6 @@ def test2() : int {
 
 test3
 
->>>>>>> 4ed5ba0ef46ace53326643578693feb7f1df6edf
 def test(var1: int var2: double): double {
     local a : double = var1 + var2 + 1
     (2 + a) * a
