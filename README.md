@@ -17,8 +17,8 @@ run it with a file:
 ## Language feature
 
 #### Declare a variable
-    a: double = 9.5
-    b: double = a + 195.3
+    a: local double = 9.5
+    b: local double = a + 195.3
     
 #### Declare a function
 You can declare a function by using this syntax `def FUNC_NAME(VAR_NAME: VAR_TYPE, ...) : RETURN_TYPE`
@@ -31,7 +31,7 @@ You can declare a function by using this syntax `def FUNC_NAME(VAR_NAME: VAR_TYP
 You can cast a value by using the syntax `cast<NEW_TYPE>(VALUE)`:
     
     def divide_by_two(x_int: int): double {
-        x_double : double = cast<double>(x)
+        x_double : local double = cast<double>(x)
         x / 2
     }
 
