@@ -92,31 +92,30 @@ convertIfExpr :: MonadModuleBuilder m => Expression -> CurrentVariables -> Name 
 convertIfExpr (IfExpr expr thenExpr Nothing) vars end = do
     (equ, newVars) <- convertExpression expr vars
     thenF <- freshName $ fromString "then"
---    let tN = fromString $ "if" ++ (show thenF)
---    let eN = fromString $ "end" ++ (show endF)
     condBr equ thenF end
     emitBlockStart thenF
     (thenOp, gv) <- executeExpressionsConversion newVars thenExpr
     emitTerm $ Br end []
     return (thenOp, gv)
---convertIfExpr (IfExpr expr thenExpr (Just elseExpr)) vars = do
---    (equ, locs) <- convertExpression expr vars
---    thenN <- fresh
---    elseN <- fresh
---    endN <- fresh
- --   condBr equ thenN elseN
---    emitBlockStart thenN
---    thenOp <- executeExpressionsConversion vars thenExpr
---    emitTerm $ Ins.Br endN []
---    emitBlockStart elseN
---    elseOp <- executeExpressionsConversion vars elseExpr
---    emitTerm $ Ins.Resume elseOp []
---    emitBlockStart endN
- --   return thenOp
+convertIfExpr (IfExpr expr thenExpr (Just elseExpr)) vars end = do
+    (equ, newVars@(_, lv)) <- convertExpression expr vars
+    thenF <- freshName $ fromString "then"
+    elseF <- freshName $ fromString "else"
+    condBr equ thenF elseF
+    emitBlockStart thenF
+    (thenOp, gv) <- executeExpressionsConversion newVars thenExpr
+    emitTerm $ Br end []
+    emitBlockStart elseF
+    (elseOp, newGv) <- executeExpressionsConversion (gv, lv) elseExpr
+    emitTerm $ Br end []
+    return (elseOp, newGv)
+
 
 convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> GlobalVariables -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs gv = do
     function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
+        entry <- freshName $ fromString "entry"
+        emitBlockStart entry
         (operand, newGv) <- executeExpressionsConversion (gv, putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
         ret operand
 
@@ -145,6 +144,20 @@ convertVariable (Var Local n t) expr vars = do
         op -> return (op, (gv, [(getASTLType t, n, Just op)] ++ lv))
 
 
+convertUnaryOpCons :: MonadModuleBuilder m => [UnaryOp] -> Operand -> IRBuilderT m Operand
+convertUnaryOpCons [] op = do
+    return op
+convertUnaryOpCons (Minus:xs) val = do
+    op <- fmul (ConstantOperand $ C.Float $ F.Double (-1)) val
+    convertUnaryOpCons xs op
+convertUnaryOpCons (BinNot:xs) val = do
+    op <- LLVM.IRBuilder.Instruction.xor (ConstantOperand $ C.Int 32 0xFFFFFFFF) val
+    convertUnaryOpCons xs op
+convertUnaryOpCons (BoolNot:xs) val = do
+    op <- LLVM.IRBuilder.Instruction.xor (ConstantOperand $ C.Int 1 1) val
+    convertUnaryOpCons xs op
+convertUnaryOpCons (_:xs) val = convertUnaryOpCons xs val
+
 convertValue :: MonadModuleBuilder m => Value -> CurrentVariables -> IRBuilderT m Operand
 convertValue (Nbr n) _ = CB.double $ fromIntegral n
 convertValue (RealNbr n) _ = CB.double n
@@ -158,9 +171,10 @@ convertValue (AST.Call (Proto name params retType) args) vars = do
 
 
 convertExpression :: MonadModuleBuilder m => Expression -> CurrentVariables -> IRBuilderT m (Operand, CurrentVariables)
-convertExpression (Unary [] val) vars = do
+convertExpression (Unary opt val) vars = do
     op <- convertValue val vars
-    return $ (op, vars)
+    newOp <- convertUnaryOpCons (reverse opt) op
+    return $ (newOp, vars)
 convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Fct (Decl proto expr)) (gv, lv) = do
     op <- convertFunction proto expr gv
@@ -181,6 +195,10 @@ convertExpression (Expr firstExpr AST.Div secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
     fmap (\s -> (s, nVars)) $ fdiv leftOp rightOp
+convertExpression (Expr firstExpr AST.Mod secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ frem leftOp rightOp
 convertExpression (Expr firstExpr AST.Equ secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
