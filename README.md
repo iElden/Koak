@@ -17,8 +17,8 @@ run it with a file:
 ## Language feature
 
 #### Declare a variable
-    a: local double = 9.5
-    b: local double = a + 195.3
+    local a: double = 9.5
+    local b: double = a + 195.3
     
 #### Declare a function
 You can declare a function by using this syntax `def FUNC_NAME(VAR_NAME: VAR_TYPE, ...) : RETURN_TYPE`
@@ -31,7 +31,7 @@ You can declare a function by using this syntax `def FUNC_NAME(VAR_NAME: VAR_TYP
 You can cast a value by using the syntax `cast<NEW_TYPE>(VALUE)`:
     
     def divide_by_two(x_int: int): double {
-        x_double : local double = cast<double>(x)
+        local x_double : double = cast<double>(x)
         x / 2
     }
 
@@ -88,7 +88,7 @@ Unary - : `-a`
 You can write a condition using the `if` keyword
 
     def is_odd(x: int): bool {
-    result : local bool = false
+    local result : bool = false
         if (x % 2 == 0) {
             result = false
         }
@@ -103,7 +103,7 @@ You can write a condition using the `if` keyword
 You can loop using the `while` keyword
 
     def f(x: int) {
-        i : local int = 1
+        local i : int = 1
         while (i < x) {
             i = i << 1
         }
