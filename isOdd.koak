@@ -8,4 +8,4 @@ def isOdd(a: int) : int {
     }
     result
 }
-isOdd(1)
+isOdd(0)

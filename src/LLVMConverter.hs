@@ -42,7 +42,8 @@ lookupVariable n (_, []) = do
     load (ConstantOperand $ C.GlobalReference (PointerType floatType $ Addr.AddrSpace 0) (fromString n)) 0
 lookupVariable n (gv ,((t, name, op):xs))
     | n == name = case op of
-        Just operand -> return operand
+        Just operand -> do
+            load operand 0
         Nothing -> return $ LocalReference t (fromString n)
     | otherwise = lookupVariable n (gv, xs)
 
@@ -51,6 +52,14 @@ isGlobalExisting n [] = return Nothing
 isGlobalExisting n ((t, name, op):xs)
     | n == name = return (Just op)
     | otherwise = isGlobalExisting n xs
+
+isLocalExisting :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m (Maybe Operand)
+isLocalExisting n [] = return Nothing
+isLocalExisting n ((t, name, op):xs)
+    | n == name = case op of
+        Just operand -> return (Just operand)
+        Nothing -> return $ Just (LocalReference t (fromString n))
+    | otherwise = isLocalExisting n xs
 
 
 
@@ -129,21 +138,23 @@ convertVariable (Var Global n t) expr vars = do
         Just op -> do
             store op 0 res
             return (op, (gv, lv))
-        Nothing -> case res of
-            (ConstantOperand cons) -> do
-                op <- global (fromString n) floatType cons
-                store op 0 res
-                return (op, ([(getASTLType t, n, op)] ++ gv, lv))
-            _ -> do
-                op <- global (fromString n) floatType $ C.Float $ F.Double 0
-                store  op 0 res
-                return (op, ([(getASTLType t, n, op)] ++ gv, lv))
+        Nothing -> do
+            op <- global (fromString n) floatType $ C.Float $ F.Double 0
+            store op 0 res
+            return (op, ([(getASTLType t, n, op)] ++ gv, lv))
 convertVariable (Var Local n t) expr vars = do
     (res, (gv, lv)) <- convertExpression expr vars
-    case res of
-        op -> return (op, (gv, [(getASTLType t, n, Just op)] ++ lv))
+    sol <- isLocalExisting n lv
+    case sol of
+        Just op -> do
+            store op 0 res
+            return (op, (gv, lv))
+        Nothing -> do
+            op <- alloca (getASTLType t) Nothing 0
+            store op 0 res
+            return (op, (gv, [(getASTLType t, n, Just op)] ++ lv))
 
-
+-- (Just (ConstantOperand $ C.Float $ F.Double 0))
 convertUnaryOpCons :: MonadModuleBuilder m => [UnaryOp] -> Operand -> IRBuilderT m Operand
 convertUnaryOpCons [] op = do
     return op
