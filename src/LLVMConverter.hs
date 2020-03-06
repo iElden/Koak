@@ -114,23 +114,11 @@ convertIfExpr (IfExpr expr thenExpr Nothing) vars end = do
 --    emitBlockStart endN
  --   return thenOp
 
-createFunctionBody :: MonadModuleBuilder m => [(String, AST.Type)] -> [Expression] -> GlobalVariables -> IRBuilderT m ([Operand] -> IRBuilderT m (), GlobalVariables)
-createFunctionBody args exprs gv = do
-        (operand, newGv) <- executeExpressionsConversion (gv, putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
-        return (\_ -> do
-            ret operand, newGv)
-
-
-convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> GlobalVariables -> IRBuilderT m (Operand, GlobalVariables)
+convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> GlobalVariables -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs gv = do
-    (func, glob) <- makeBody
-    swap <$> (,) glob <$> makeOperand name args retType func
-    where
-        makeBody :: MonadModuleBuilder m => IRBuilderT m ([Operand] -> IRBuilderT m (), GlobalVariables)
-        makeBody = createFunctionBody args exprs gv
-        makeOperand :: MonadModuleBuilder m => String -> [(String, AST.Type)] -> AST.Type -> ([Operand] -> IRBuilderT m ()) -> IRBuilderT m Operand
-        makeOperand name args retType fct = do
-            function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) fct
+    function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
+        (operand, newGv) <- executeExpressionsConversion (gv, putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
+        ret operand
 
 
 
@@ -140,16 +128,16 @@ convertVariable (Var Global n t) expr vars = do
     sol <- isGlobalExisting n gv
     case sol of
         Just op -> do
-            store res 0 op
+            store op 0 res
             return (op, (gv, lv))
         Nothing -> case res of
             (ConstantOperand cons) -> do
                 op <- global (fromString n) floatType cons
-                store res 0 op
+                store op 0 res
                 return (op, ([(getASTLType t, n, op)] ++ gv, lv))
             _ -> do
                 op <- global (fromString n) floatType $ C.Float $ F.Double 0
-                store res 0 op
+                store  op 0 res
                 return (op, ([(getASTLType t, n, op)] ++ gv, lv))
 convertVariable (Var Local n t) expr vars = do
     (res, (gv, lv)) <- convertExpression expr vars
@@ -175,8 +163,8 @@ convertExpression (Unary [] val) vars = do
     return $ (op, vars)
 convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Fct (Decl proto expr)) (gv, lv) = do
-    (op, newGv) <- convertFunction proto expr gv
-    return $ (op, (newGv, lv))
+    op <- convertFunction proto expr gv
+    return $ (op, (gv, lv))
 convertExpression (Expr firstExpr AST.Add secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars

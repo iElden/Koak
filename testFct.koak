@@ -5,7 +5,7 @@ def test(var1: int var2: double): double {
 
 global x: int = 0
 
-x = 1
+x = 0
 if (x == 1) {
     x = test(1 2)
 }
