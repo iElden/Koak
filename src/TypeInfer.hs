@@ -99,13 +99,13 @@ getExpressionType (IfExpr cond ifExprs (Just elseExprs))= case checkExpressionsT
             (msgs3, Just BooleanVar)-> (msgs ++ msgs2 ++ msgs3, Just Void)
             (msgs3, Nothing)        -> (msgs ++ msgs2 ++ msgs3, Nothing)
             (msgs3, Just t)         -> (msgs ++ msgs2 ++ msgs3 ++ [Error $ "Couldn't match expected type bool with actual type " ++ show t, getExpr cond], Nothing)
-getExpressionType (WhileExpr cond whileExprs)           = case checkExpressionsType whileExprs of
+getExpressionType (WhileExpr cond whileExprs) = case checkExpressionsType whileExprs of
     (msgs, Nothing)-> (msgs, Nothing)
     (msgs, _)      -> case getExpressionType cond of
         (msgs2, Just BooleanVar)-> (msgs ++ msgs2, Just Void)
         (msgs2, Nothing)        -> (msgs ++ msgs2, Nothing)
         (msgs2, Just t)         -> (msgs ++ msgs2 ++ [Error $ "Couldn't match expected type bool with actual type " ++ show t, getExpr cond], Nothing)
-getExpressionType v@(Expr expr1 op expr2)                = case getExpressionType expr1 of
+getExpressionType v@(Expr expr1 op expr2) = case getExpressionType expr1 of
     (msgs, Nothing) -> (msgs, Nothing)
     (msgs, Just t1) -> case getExpressionType expr2 of
         (msgs2, Nothing) -> (msgs ++ msgs2, Nothing)
@@ -115,7 +115,17 @@ getExpressionType v@(Expr expr1 op expr2)                = case getExpressionTyp
             else
                 (msgs ++ msgs2 ++ [Error $ "Invalid operand '" ++ show op ++ "' between " ++ show t1 ++ " and " ++ show t2, getExpr v], Nothing)
 
-getExpressionType (Fct fct)                             = ([], Just Void)
+getExpressionType (Fct (Decl (Proto name _ Void) exprs)) = case fmap sequence $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
+    (msgs, Nothing) -> (msgs, Nothing)
+    (msgs, Just _) -> (msgs, Just Void)
+getExpressionType expr@(Fct (Decl (Proto name _ retType) exprs))= case fmap sequence $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
+    (msgs, Nothing) -> (msgs, Nothing)
+    (msgs, Just []) -> (msgs ++ [Error "Non-void function must return a value", getExpr expr], Nothing)
+    (msgs, Just var) -> if last var == retType then
+            (msgs, Just Void)
+        else
+            (msgs ++ [Error $ "Couldn't match expected type " ++ show retType ++ " with actual type " ++ show (last var), getExpr $ last exprs], Nothing)
+
 getExpressionType (Cast t _)                            = ([], Just t)
 getExpressionType (Extern name t)                       = ([], Just Void)
 getExpressionType expr@(Unary _ (GlobVar n))            = ([Error $ "Cannot get type of " ++ show expr, getExpr expr], Nothing)
