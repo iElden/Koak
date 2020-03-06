@@ -84,4 +84,27 @@ Unary + : `+a`
 
 Unary - : `-a`
 
+#### Condition
+You can write a condition using the `if` keyword
 
+    def is_odd(x: int): bool {
+    result : local bool = false
+        if (x % 2 == 0) {
+            result = false
+        }
+        else {
+            result = true
+        }
+        result
+    }
+
+
+#### Loop
+You can loop using the `while` keyword
+
+    def f(x: int) {
+        i : local int = 1
+        while (i < x) {
+            i = i << 1
+        }
+    }
