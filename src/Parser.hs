@@ -251,7 +251,7 @@ parseUnary :: Parser Expression
 parseUnary = Unary <$> many (many parseSoftSeparator *> parseUnOp) <*> (many parseSoftSeparator *> parseLiteral)
 
 parseExpression :: Parser Expression
-parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseCast <|> parseExtern <|> parseBinExpr 0
+parseExpression = parseWhile <|> parseIf <|> parseFunction <|> parseExtern <|> parseBinExpr 0
 
 parseLiteral :: Parser Value
 parseLiteral = parseFunctionCall <|> parseBoolean <|> parseDouble <|> parseInteger <|> parseTypedIdentifier <|> parseIdentifier
