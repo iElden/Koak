@@ -76,13 +76,13 @@ findVarTypeTest = describe "findVarTypeTest (UT)" $ do
 checkExpressionTestUnaries :: Spec
 checkExpressionTestUnaries = describe "checkExpressionTestUnaries (FT)" $ do
     it "(Unary ops (GlobVar v)) with no scope" $
-        checkExpression [] ((Unary [] (GlobVar "var"))) `shouldBe`
+        checkExpression False [] ((Unary [] (GlobVar "var"))) `shouldBe`
         (([Error "Use of undeclared identifier var", Info "In expression \'@var\'\n"], Nothing), [])
     it "(Unary ops (GlobVar v)) with scope found" $
-        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] ((Unary [] (GlobVar "var"))) `shouldBe`
+        checkExpression False [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] ((Unary [] (GlobVar "var"))) `shouldBe`
         (([], Just $ Unary [] $ Var Global "var" IntegerVar), [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)])
     it "(Unary ops (Var v t)) with no scope" $
-        checkExpression [] (Unary [] $ Var Global "var" IntegerVar) `shouldBe`
+        checkExpression False [] (Unary [] $ Var Global "var" IntegerVar) `shouldBe`
         (([], Just (Unary [] $ Var Global "var" IntegerVar)), [("var", Var Global "var" IntegerVar)])
 --    it "(Unary ops (Var v t)) with scope and cast succeed" $
 --        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Unary [] $ Var Global "var" FloatingVar) `shouldBe`
@@ -93,12 +93,12 @@ checkExpressionTestUnaries = describe "checkExpressionTestUnaries (FT)" $ do
 checkExpressionTestExpressions :: Spec
 checkExpressionTestExpressions = describe "checkExpressionTestExpressions (FT)" $ do
     it "Expr (Unary ops (GlobVar v)) Asg expr) where nothing" $
-        checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Unary [] $ Nbr 4) `shouldBe`
+        checkExpression False [] (Expr (Unary [] $ GlobVar "var") Asg $ Unary [] $ Nbr 4) `shouldBe`
         (([Error "Use of undeclared identifier var", Info "In expression \'@var = 4\'\n"], Nothing), [])
     it "(var = vor = 4) with no scope for them" $
-        checkExpression [] (Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Unary [] $ Nbr 4) `shouldBe`
+        checkExpression False [] (Expr (Unary [] $ GlobVar "var") Asg $ Expr (Unary [] $ GlobVar "vor") Asg $ Unary [] $ Nbr 4) `shouldBe`
         (([Error "Use of undeclared identifier var", Info "In expression \'@var = @vor = 4\'\n", Error "Use of undeclared identifier vor", Info "In expression \'@vor = 4\'\n"],
         Nothing), [])
     it "var = 4 with scope for him" $
-        checkExpression [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Unary [] $ Nbr 4) `shouldBe`
+        checkExpression False [("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)] (Expr (Unary [] $ GlobVar "var") Asg $ Unary [] $ Nbr 4) `shouldBe`
         (([], Just $ (Expr (Unary [] (Var Global "var" IntegerVar)) Asg ((Unary [] (Nbr 4))))), [("var", Var Global "var" IntegerVar), ("var", Var Global "var" IntegerVar), ("vor", Var Global "vor" FloatingVar)])
