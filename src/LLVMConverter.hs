@@ -126,6 +126,16 @@ convertIfExpr (IfExpr expr thenExpr (Just elseExpr)) vars end = do
     emitTerm $ Br end []
     return (elseOp, newGv)
 
+convertWhileExpr :: MonadModuleBuilder m => Expression -> CurrentVariables -> Name -> IRBuilderT m (Operand, GlobalVariables)
+convertWhileExpr (WhileExpr expr body) vars end = do
+    (equ, (g, l)) <- convertExpression expr vars
+    loopF <- freshName $ fromString "loop"
+    condBr equ loopF end
+    emitBlockStart loopF
+    (loopOp, gv) <- executeExpressionsConversion (g, l) body
+    (newEqu, nVars) <- convertExpression expr (gv, l)
+    condBr newEqu loopF end
+    return (loopOp, gv)
 
 convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> GlobalVariables -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs gv = do
@@ -324,10 +334,15 @@ convertExpression (Expr firstExpr AST.BOr secExpr) vars = do
     (rightOp, nVars) <- convertExpression secExpr newVars
     fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.or leftOp rightOp
 
--- IF EXPR --
+-- Conditional Branching EXPR --
 convertExpression ex@(IfExpr expr thenExpr elseExpr) vars@(_, lv) = do
     endF <- freshName $ fromString "end"
     (op, gv) <- convertIfExpr ex vars endF
+    emitBlockStart endF
+    return (op, (gv, lv))
+convertExpression ex@(WhileExpr expr body) vars@(_, lv) = do
+    endF <- freshName $ fromString "end"
+    (op, gv) <- convertWhileExpr ex vars endF
     emitBlockStart endF
     return (op, (gv, lv))
 
