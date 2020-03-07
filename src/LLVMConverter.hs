@@ -36,11 +36,12 @@ floatType = FloatingPointType DoubleFP
 
 -- lookups in variable
 type VarName = String
+type ModuleName = String
 type LocalVariables = [(ASTL.Type, VarName, Maybe Operand)]
 type GlobalVariables = [(ASTL.Type, VarName, Operand)]
 type CurrentVariables = (GlobalVariables, LocalVariables)
 
-lookupVariable :: MonadModuleBuilder m => String -> CurrentVariables -> IRBuilderT m Operand
+lookupVariable :: MonadModuleBuilder m => VarName -> CurrentVariables -> IRBuilderT m Operand
 lookupVariable n (((t, name, op):xs), [])
     | n == name = do
         load op 0
@@ -52,13 +53,13 @@ lookupVariable n (gv, ((t, name, op):xs))
         Nothing -> return $ LocalReference t (fromString n)
     | otherwise = lookupVariable n (gv, xs)
 
-isGlobalExisting :: MonadModuleBuilder m => String -> GlobalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
+isGlobalExisting :: MonadModuleBuilder m => VarName -> GlobalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
 isGlobalExisting n [] = return Nothing
 isGlobalExisting n ((t, name, op):xs)
     | n == name = return (Just (op, t))
     | otherwise = isGlobalExisting n xs
 
-isLocalExisting :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
+isLocalExisting :: MonadModuleBuilder m => VarName -> LocalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
 isLocalExisting n [] = return Nothing
 isLocalExisting n ((t, name, op):xs)
     | n == name = case op of
@@ -73,10 +74,7 @@ getParamsValueInLLVM list vars = sequence $ fmap (\s -> fmap (\f -> (fst f, []))
 --getParamsValueInLLVM [] = return []
 --getParamsValueInLLVM (c:cs) = sequence ((convertValue c), []) ++ getParamsValueInLLVM cs
 
-putFPinLocalVariables :: LocalVariables -> ([ASTL.Type], [String]) -> LocalVariables
-putFPinLocalVariables vars (types, names) = zip3 types names $ replicate (length names) Nothing
-
-getFunctionParameters :: [(String, AST.Type)] -> [(ASTL.Type, String)]
+getFunctionParameters :: [(VarName, AST.Type)] -> [(ASTL.Type, VarName)]
 getFunctionParameters [] = []
 getFunctionParameters ((n, typ):cs) = [(getASTLType typ, n)] ++ getFunctionParameters cs
 
@@ -138,12 +136,24 @@ convertWhileExpr (WhileExpr expr body) vars end = do
     condBr newEqu loopF end
     return (loopOp, gv)
 
+initLocalVariables :: MonadModuleBuilder m => LocalVariables -> [(ASTL.Type, VarName)] -> IRBuilderT m (Operand, LocalVariables)
+initLocalVariables lv ((t, n):[]) = do
+    op <- alloca t Nothing 0
+    store op 0 (LocalReference t $ fromString n)
+    return (op, ([(t, n, Just op)] ++ lv))
+initLocalVariables lv ((t, n):xs) = do
+    op <- alloca t Nothing 0
+    store op 0 (LocalReference t $ fromString n)
+    initLocalVariables ([(t, n, Just op)] ++ lv) xs
+
+
 convertFunction :: MonadModuleBuilder m => FunctionPrototype -> [Expression] -> GlobalVariables -> IRBuilderT m Operand
 convertFunction (Proto name args retType) exprs gv = do
     function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
         entry <- freshName $ fromString "entry"
         emitBlockStart entry
-        (operand, newGv) <- executeExpressionsConversion (gv, putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
+        (op, lv) <- initLocalVariables [] $ getFunctionParameters args
+        (operand, newGv) <- executeExpressionsConversion (gv, lv) exprs
         ret operand
 
 --guessType :: Operand -> Maybe ASTL.Type
@@ -255,29 +265,53 @@ convertExpression (Extern n (AST.Function (Proto name args retType))) vars = do
 convertExpression (Expr firstExpr AST.Add secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fadd leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ add leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fadd leftOp rightOp
 convertExpression (Expr firstExpr AST.Sub secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fsub leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ sub leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fsub leftOp rightOp
 convertExpression (Expr firstExpr AST.Mul secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fmul leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ mul leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fmul leftOp rightOp
 convertExpression (Expr firstExpr AST.Div secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fdiv leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ sdiv leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fdiv leftOp rightOp
 convertExpression (Expr firstExpr AST.Mod secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ frem leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ srem leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ frem leftOp rightOp
 convertExpression (Expr firstExpr AST.Pow secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
     let fctOp = (ConstantOperand $ C.GlobalReference (FunctionType floatType ([floatType, floatType]) False) $ fromString "pow")
-    let params = [(leftOp, []), (rightOp, [])]
-    fmap (\s -> (s, nVars)) $ call fctOp params
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> do
+            newLeftOp <- castValues leftOp (IntegerType 32) (floatType)
+            newRightOp <- castValues rightOp (IntegerType 32) (floatType)
+            let params = [(newLeftOp, []), (newRightOp, [])]
+            newOp <- call fctOp params
+            fmap (\s -> (s, nVars)) $ castValues newOp (floatType) (IntegerType 32)
+        _ -> do
+            let params = [(leftOp, []), (rightOp, [])]
+            fmap (\s -> (s, nVars)) $ call fctOp params
 
 -- BINARY CALCULATIONS --
 convertExpression (Expr firstExpr AST.And secExpr) vars = do
@@ -305,27 +339,45 @@ convertExpression (Expr firstExpr AST.LSh secExpr) vars = do
 convertExpression (Expr firstExpr AST.Equ secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.UEQ leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.EQ leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.UEQ leftOp rightOp
 convertExpression (Expr firstExpr AST.Neq secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.UNE leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.NE leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.UNE leftOp rightOp
 convertExpression (Expr firstExpr AST.Gt secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.UGT leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.UGT leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.UGT leftOp rightOp
 convertExpression (Expr firstExpr AST.Gte secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.UGE leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.UGE leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.UGE leftOp rightOp
 convertExpression (Expr firstExpr AST.Lt secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.ULT leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.ULT leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.ULT leftOp rightOp
 convertExpression (Expr firstExpr AST.Lte secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    fmap (\s -> (s, nVars)) $ fcmp FPP.ULE leftOp rightOp
+    let typ = getExpressionType firstExpr
+    case typ of
+        (_, Just IntegerVar) -> fmap (\s -> (s, nVars)) $ icmp IP.ULE leftOp rightOp
+        _ -> fmap (\s -> (s, nVars)) $ fcmp FPP.ULE leftOp rightOp
 convertExpression (Expr firstExpr AST.BAnd secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
@@ -350,7 +402,7 @@ convertExpression ex@(WhileExpr expr body) vars@(_, lv) = do
 -- CRASH --
 convertExpression expr _ = error $ "Unimplemented expression '" ++ show expr ++ "'"
 
-makeASTModule :: String -> [Expression] -> Module
+makeASTModule :: ModuleName -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
     function "main" [] i32 $ \_ -> do
         value <- CB.int32 $ 0
