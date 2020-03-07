@@ -1,2 +1,0 @@
-global x: int = 0
-5 + 5

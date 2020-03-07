@@ -1,3 +1,0 @@
-global test: int = 0
-test2 = 0
-test = 1
