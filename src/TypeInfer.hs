@@ -245,7 +245,7 @@ checkExpression _ scope expr@(Extern name t) = (([], Just expr), (name, (Var Glo
 checkExpression _ scope (Fct (Decl proto@(Proto name args _) exprs)) = case findVarType scope name of
     Nothing ->
         case filter ((/=) Nothing) $ fmap (\(s, t) -> findVarType scope s) args of
-            [] -> case inferTypes True (scope ++ fmap (\(n, vt) -> (n, Var Local n vt)) args) exprs of
+            [] -> case inferTypes True (((name, Var Global name $ Function proto):scope) ++ fmap (\(n, vt) -> (n, Var Local n vt)) args) exprs of
                 (msgs, Nothing) -> ((msgs, Nothing), (name, Var Global name $ Function proto):scope)
                 (msgs, Just exs) -> ((msgs, Just (Fct (Decl proto exs))), (name, Var Global name $ Function proto):scope)
             arr -> (([Error "Shadow is prohibited", Info $ "In expression \'" ++ show proto ++ "\'\n"], Nothing), (name, Var Global name $ Function proto):scope)
