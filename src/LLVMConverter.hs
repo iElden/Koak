@@ -347,6 +347,9 @@ convertExpression ex@(WhileExpr expr body) vars@(_, lv) = do
     emitBlockStart endF
     return (op, (gv, lv))
 
+-- CRASH --
+convertExpression expr _ = error $ "Unimplemented expression '" ++ show expr ++ "'"
+
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
     function "main" [] i32 $ \_ -> do
