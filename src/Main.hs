@@ -44,6 +44,8 @@ parseArgs = parseArguments ([], False, False, False)
 
         parseArguments (files, debug, genLL, True) ("-o":xs) = Right $ Error "Object generation is already enabled"
         parseArguments (files, debug, genLL, True) ("--object":xs) = Right $ Error "Object generation is already enabled"
+
+        parseArguments (files, debug, genLL, True) (opt@('-':_):_) = Right $ Error $ "Unrecognized option " ++ opt
         parseArguments (files, debug, genLL, genO) (file:xs) = parseArguments (files ++ [file], debug, genLL, genO) xs
 
 
