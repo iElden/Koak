@@ -14,6 +14,11 @@ run it with a file:
 
 <br>
 
+## Options
+    -l, --ll     Create an llvm script file (.ll)
+    -o, --object Create an object file (.o)
+    -d, --debug  Debug flag, don't use it
+
 ## Language feature
 
 #### Declare a variable
@@ -102,7 +107,7 @@ You can write a condition using the `if` keyword
 #### Loop
 You can loop using the `while` keyword
 
-    def f(x: int) {
+    def f(x: int): void {
         local i : int = 1
         while (i < x) {
             i = i << 1
@@ -113,3 +118,6 @@ You can loop using the `while` keyword
 ## Link the output file
 
     gcc koak_output_file.o other_koak_output_file.o -lm
+
+## Examples
+Some examples can be found at https://github.com/iElden/Koak/tree/master/koakExamples
