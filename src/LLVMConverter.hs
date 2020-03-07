@@ -230,7 +230,8 @@ convertExpression (Unary opt val) vars = do
     return $ (newOp, vars)
 convertExpression (Cast tb ta expr) vars = do
     (op, newVars) <- convertExpression expr vars
-    castValues op (getASTLType tb) (getASTLType ta)
+    newOp <- castValues op (getASTLType tb) (getASTLType ta)
+    return (newOp, newVars)
 convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Fct (Decl proto expr)) (gv, lv) = do
     op <- convertFunction proto expr gv
@@ -264,7 +265,6 @@ convertExpression (Expr firstExpr AST.Pow secExpr) vars = do
     let params = [(leftOp, []), (rightOp, [])]
     fmap (\s -> (s, nVars)) $ call fctOp params
 
-
 -- BINARY CALCULATIONS --
 convertExpression (Expr firstExpr AST.And secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
@@ -278,6 +278,14 @@ convertExpression (Expr firstExpr AST.Xor secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
     fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.xor leftOp rightOp
+convertExpression (Expr firstExpr AST.RSh secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ lshr leftOp rightOp
+convertExpression (Expr firstExpr AST.LSh secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ shl leftOp rightOp
 
 -- COMPARISONS --
 convertExpression (Expr firstExpr AST.Equ secExpr) vars = do
@@ -307,19 +315,11 @@ convertExpression (Expr firstExpr AST.Lte secExpr) vars = do
 convertExpression (Expr firstExpr AST.BAnd secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    case leftOp of
-        (ConstantOperand $ C.Int 1 1) -> case rightOp of
-            (ConstantOperand $ C.Int 1 1) -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
-            _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
-        _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
+    fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.and leftOp rightOp
 convertExpression (Expr firstExpr AST.BOr secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
-    case leftOp of
-        (ConstantOperand $ C.Int 1 0) -> case rightOp of
-            (ConstantOperand $ C.Int 1 0) -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
-            _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
-        _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
+    fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.or leftOp rightOp
 
 -- IF EXPR --
 convertExpression ex@(IfExpr expr thenExpr elseExpr) vars@(_, lv) = do
