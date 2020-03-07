@@ -36,11 +36,11 @@ parseFiles [x] =  do
             displayMsgs ex
             displayMsgs msgs
             displayMsgs exprs
-            displayLLVMResult x $ checkExpressionsType exprs
+            displayLLVMResult x $ checkFileExpressionsType exprs
         displayTypeResult x False _ (msgs, Just exprs) = do
             Prelude.putStrLn $ "//File " ++ x
             displayMsgs msgs
-            displayLLVMResult x $ checkExpressionsType exprs
+            displayLLVMResult x $ checkFileExpressionsType exprs
         displayTypeResult x True ex (msgs, _) = displayMsgs ex >> displayMsgs msgs
         displayTypeResult x False _ (msgs, _) = displayMsgs msgs
 

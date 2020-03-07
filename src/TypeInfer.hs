@@ -9,7 +9,8 @@ module TypeInfer (
     isCastValid,
     findVarType,
     checkExpression,
-    checkExpressionsType
+    checkExpressionsType,
+    checkFileExpressionsType
     ) where
 
 import AST
@@ -140,6 +141,21 @@ checkExpressionsType :: [Expression] -> ([Message], Maybe [Expression])
 checkExpressionsType exprs = case fmap sequence_ $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
     (msgs, Nothing) -> (msgs, Nothing)
     (msgs, _) -> (msgs, Just exprs)
+
+isReleventExpression :: Expression -> Bool
+isReleventExpression (Fct _) = False
+isReleventExpression (Extern _ _) = False
+isReleventExpression _ = True
+
+checkFileExpressionsType :: [Expression] -> ([Message], Maybe [Expression])
+checkFileExpressionsType exprs = case checkExpressionsType exprs of
+    v@(_, Nothing)  -> v
+    v@(msgs, Just ex) -> case filter isReleventExpression ex of
+        [] -> v
+        exprs -> case getExpressionType $ last exprs of
+            (_, Nothing) -> (msgs, Nothing)
+            (_, Just IntegerVar) -> v
+            (_, Just t) -> (msgs ++ [Error $ "Function main should return an int but found " ++ show t, getExpr $ last exprs], Nothing)
 
 checkExpression :: Bool -> Scope -> Expression -> (([Message], Maybe Expression), Scope)
 checkExpression _ scope val@(Unary ops (GlobVar v)) = case findVarType scope v of
