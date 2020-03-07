@@ -11,7 +11,8 @@ module TypeInfer (
     checkExpression,
     checkExpressionsType,
     checkFileExpressionsType,
-    isReleventExpression
+    isReleventExpression,
+    getExpressionType
     ) where
 
 import AST
