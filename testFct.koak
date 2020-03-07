@@ -17,6 +17,6 @@ def test(var1: int var2: double): double {
 global x: double = 0.
 
 if (x == 1.0) {
-    x = test(1 2)
+    x = test(1 2.)
 }
 cast<int>(x)

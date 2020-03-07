@@ -15,6 +15,8 @@ module TypeInfer (
     ) where
 
 import AST
+import Data.List
+import Data.Tuple
 
 data Message =
     Info String |
@@ -43,6 +45,15 @@ varNotFound varName expr = [Error $ "Use of undeclared identifier " ++ varName, 
 
 noEffect :: Expression -> [Message]
 noEffect e = [Warning "This statement has no effect", getExpr e]
+
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
+
+thd3 :: (a, b, c) -> c
+thd3 (_, _, c) = c
 
 isCastValid :: Type -> Type -> Bool
 isCastValid IntegerVar BooleanVar = True
@@ -87,11 +98,24 @@ findVarType ((varName, var):scope) name
     | otherwise = findVarType scope name
 
 getExpressionType :: Expression -> ([Message], Maybe Type)
-getExpressionType (Unary _ (Nbr n))                     = ([], Just IntegerVar)
-getExpressionType (Unary _ (RealNbr n))                 = ([], Just FloatingVar)
-getExpressionType (Unary _ (Var _ _ t))                 = ([], Just t)
-getExpressionType (Unary _ (Call (Proto _ _ retType) _))= ([], Just retType)
-getExpressionType (IfExpr cond ifExprs Nothing)         = case checkExpressionsType ifExprs of
+getExpressionType (Unary _ (Nbr n))                                 = ([], Just IntegerVar)
+getExpressionType (Unary _ (RealNbr n))                             = ([], Just FloatingVar)
+getExpressionType (Unary _ (Var _ _ t))                             = ([], Just t)
+getExpressionType e@(Unary _ (Call (Proto name paramsTypes retType) params)) = case swap $ fmap (foldl (++) []) $ swap $ fmap sequence $ unzip $ fmap getExpressionType params of
+    (msgs, Nothing) -> (msgs, Nothing)
+    (msgs, Just types) -> checkCallTypes e params msgs name $ zipWith (\a b -> (a == b, a, b)) types $ snd $ unzip paramsTypes
+    where
+        checkCallTypes :: Expression -> [Expression] -> [Message] -> String -> [(Bool, Type, Type)] -> ([Message], Maybe Type)
+        checkCallTypes expr exprs msgs name results = case all fst3 results of
+            True -> (msgs, Just retType)
+            False -> (msgs ++ (invalidCallPerformed exprs name results $ maybe 0 id $ elemIndex False $ fmap fst3 results) ++ [getExpr expr], Nothing)
+
+        invalidCallPerformed :: [Expression] -> String -> [(Bool, Type, Type)] -> Int -> [Message]
+        invalidCallPerformed exprs name results ind = [invalidCallPerformedMessage ind $ results !! ind, Info $ "In expression \'" ++ show (exprs !! ind) ++ "\'"]
+
+        invalidCallPerformedMessage :: Int -> (Bool, Type, Type) -> Message
+        invalidCallPerformedMessage ind t = Error $ "Invalid parameter #" ++ show (ind + 1) ++ " for function " ++ name ++ ": Couldn't match expected type " ++ show (snd3 t) ++ " with actual type " ++ show (thd3 t)
+getExpressionType (IfExpr cond ifExprs Nothing) = case checkExpressionsType ifExprs of
     (msgs, Nothing)-> (msgs, Nothing)
     (msgs, _)      -> case getExpressionType cond of
         (msgs2, Just BooleanVar)-> (msgs ++ msgs2, Just Void)
