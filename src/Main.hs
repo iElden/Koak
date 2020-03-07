@@ -92,6 +92,7 @@ compileFile debug genLL genO path =  do
                     Module.writeObjectToFile target (Module.File path) llvmMod
 
         displayMsgs :: Show a => [a] -> IO ()
+        displayMsgs [] = return ()
         displayMsgs msgs = Prelude.putStrLn $ intercalate "\n" $ fmap show msgs
 
 compileFiles :: [FilePath] -> DebugMode -> GenerateLLVMScript -> GenerateObject -> IO()
