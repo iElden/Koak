@@ -4,6 +4,7 @@
 module LLVMConverter (makeASTModule) where
 
 import AST
+import TypeInfer
 import Data.Text.Lazy.IO as T
 import Data.Tuple
 
@@ -353,8 +354,14 @@ makeASTModule name [] = buildModule (fromString name) $ do
         ret $ value
 makeASTModule name exprs = buildModule (fromString name) $ do
     extern (fromString "pow") [floatType, floatType] floatType
-    function "main" [] i32 $ \_ -> do
-        entry <- freshName $ fromString "entry"
-        emitBlockStart entry
-        (operand, gv) <- executeExpressionsConversion ([], []) exprs
-        ret operand
+    case filter isReleventExpression exprs of
+        [] -> function "@@" [] i32 $ \_ -> do
+            entry <- freshName $ fromString "entry"
+            emitBlockStart entry
+            (operand, gv) <- executeExpressionsConversion ([], []) exprs
+            ret operand
+        _ -> function "main" [] i32 $ \_ -> do
+            entry <- freshName $ fromString "entry"
+            emitBlockStart entry
+            (operand, gv) <- executeExpressionsConversion ([], []) exprs
+            ret operand

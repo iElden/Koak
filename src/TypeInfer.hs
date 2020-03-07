@@ -10,7 +10,8 @@ module TypeInfer (
     findVarType,
     checkExpression,
     checkExpressionsType,
-    checkFileExpressionsType
+    checkFileExpressionsType,
+    isReleventExpression
     ) where
 
 import AST

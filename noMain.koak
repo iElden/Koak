@@ -1,0 +1,12 @@
+def factorial(n: int): int {
+    local count: int = 1
+    local result: int = 1
+
+    while (n != 0) {
+    	result = result * count
+	    count = count + 1
+	    n = n - 1
+    }
+    result
+}
+0
