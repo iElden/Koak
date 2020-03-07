@@ -217,7 +217,7 @@ convertValue (RealNbr n) _ = CB.double n
 convertValue (Var _ n _) vars = lookupVariable n vars
 convertValue (AST.Call (Proto name params retType) args) vars = do
     parameters <- getParamsValueInLLVM args vars
-    call (ConstantOperand $ C.GlobalReference (FunctionType floatType (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters
+    call (ConstantOperand $ C.GlobalReference (FunctionType (getASTLType retType) (fst $ unzip $ getFunctionParameters params) False) $ fromString name) parameters
 --convertValue (GlobVar n) = do
 --    return $ LocalReference (FloatingPointType DoubleFP) $ fromString n
 --convertValue (Var n IntegerVar) = LocalReference (IntegerType 32) $ fromString n
@@ -236,6 +236,9 @@ convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val 
 convertExpression (Fct (Decl proto expr)) (gv, lv) = do
     op <- convertFunction proto expr gv
     return $ (op, (gv, lv))
+convertExpression (Extern n (AST.Function (Proto name args retType))) vars = do
+    let types = fst $ unzip $ getFunctionParameters args
+    fmap (\s -> (s, vars)) $ extern (fromString n) types $ getASTLType retType
 
 -- CLASSIC CALCULATIONS --
 convertExpression (Expr firstExpr AST.Add secExpr) vars = do
