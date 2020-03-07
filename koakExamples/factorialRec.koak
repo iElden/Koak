@@ -1,0 +1,9 @@
+def factorialRec(n: int): int {
+    local result: int
+
+    if (n == 0) {
+        result = 1
+    } else {
+        result = n * factorialRec(n - 1)
+    }
+}

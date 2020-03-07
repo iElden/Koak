@@ -1,4 +1,4 @@
-def factorial(n: int): int {
+def factorialIt(n: int): int {
     local count: int = 1
     local result: int = 1
 
@@ -9,4 +9,3 @@ def factorial(n: int): int {
     }
     result
 }
-0
