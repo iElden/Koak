@@ -1,0 +1,11 @@
+def test(var1: int var2: double): double {
+    local a : double = cast<double>(var1) + var2 + 1.
+    (2. + a) * a
+}
+
+global x: double = 0.
+
+if (x == 1.0) {
+    x = test(1 2)
+}
+cast<int>(x)

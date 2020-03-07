@@ -10,6 +10,7 @@ import Data.Tuple
 import LLVM.Pretty  -- from the llvm-hs-pretty package
 import LLVM.AST hiding (function)
 import LLVM.AST.Type as ASTL
+import LLVM.AST.Name
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Operand as O
@@ -17,6 +18,7 @@ import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.ParameterAttribute as PA
 import qualified LLVM.AST.Instruction as Ins
 import qualified LLVM.AST.FloatingPointPredicate as FPP
+import qualified LLVM.AST.IntegerPredicate as IP
 import qualified LLVM.AST.AddrSpace as Addr
 
 import Data.String
@@ -38,27 +40,29 @@ type GlobalVariables = [(ASTL.Type, VarName, Operand)]
 type CurrentVariables = (GlobalVariables, LocalVariables)
 
 lookupVariable :: MonadModuleBuilder m => String -> CurrentVariables -> IRBuilderT m Operand
-lookupVariable n (_, []) = do
-    load (ConstantOperand $ C.GlobalReference (PointerType floatType $ Addr.AddrSpace 0) (fromString n)) 0
-lookupVariable n (gv ,((t, name, op):xs))
+lookupVariable n (((t, name, op):xs), [])
+    | n == name = do
+        load op 0
+    | otherwise = lookupVariable n (xs, [])
+lookupVariable n (gv, ((t, name, op):xs))
     | n == name = case op of
         Just operand -> do
             load operand 0
         Nothing -> return $ LocalReference t (fromString n)
     | otherwise = lookupVariable n (gv, xs)
 
-isGlobalExisting :: MonadModuleBuilder m => String -> GlobalVariables -> IRBuilderT m (Maybe Operand)
+isGlobalExisting :: MonadModuleBuilder m => String -> GlobalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
 isGlobalExisting n [] = return Nothing
 isGlobalExisting n ((t, name, op):xs)
-    | n == name = return (Just op)
+    | n == name = return (Just (op, t))
     | otherwise = isGlobalExisting n xs
 
-isLocalExisting :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m (Maybe Operand)
+isLocalExisting :: MonadModuleBuilder m => String -> LocalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
 isLocalExisting n [] = return Nothing
 isLocalExisting n ((t, name, op):xs)
     | n == name = case op of
-        Just operand -> return (Just operand)
-        Nothing -> return $ Just (LocalReference t (fromString n))
+        Just operand -> return (Just (operand, t))
+        Nothing -> return $ Just (LocalReference t (fromString n), t)
     | otherwise = isLocalExisting n xs
 
 
@@ -76,9 +80,12 @@ getFunctionParameters [] = []
 getFunctionParameters ((n, typ):cs) = [(getASTLType typ, n)] ++ getFunctionParameters cs
 
 getASTLType :: AST.Type -> ASTL.Type
+getASTLType Void = VoidType
+getASTLType IntegerVar = IntegerType 32
+getASTLType BooleanVar = IntegerType 1
 getASTLType FloatingVar = floatType
-getASTLType IntegerVar = floatType
-getASTLType _ = floatType
+getASTLType (UnknownType name) = NamedTypeReference (fromString name)
+getASTLType (AST.Function (Proto name params retType)) = FunctionType (getASTLType retType) (fst $ unzip $ getFunctionParameters params) False
 
 --convertNewExpression :: MonadModuleBuilder m => [Expression] -> LocalVariables -> IRBuilderT m (Operand, LocalVariables)
 --convertNewExpression (x:[]) vars = convertExpression x vars
@@ -128,6 +135,37 @@ convertFunction (Proto name args retType) exprs gv = do
         (operand, newGv) <- executeExpressionsConversion (gv, putFPinLocalVariables [] $ unzip $ getFunctionParameters args) exprs
         ret operand
 
+--guessType :: Operand -> Maybe ASTL.Type
+--guessType (LocalReference t n) = Just t
+--guessType (ConstantOperand cons) = case cons of
+--    (C.Int n _) -> IntegerType n
+--    (C.Float _) -> floatType
+--    (C.AggregateZero t) -> VoidType
+--    (C.FAdd cons1 cons2) -> case (guessType cons1) of
+--        (C.Int 32 _) -> case (guessType cons2) of
+--            (C.Int 32 _) -> IntegerType 32
+--            _ -> floatType
+--        _ -> floatType
+
+castValues :: MonadModuleBuilder m => Operand -> ASTL.Type -> ASTL.Type -> IRBuilderT m Operand
+castValues op VoidType VoidType = return op
+castValues op (IntegerType 1) (IntegerType 1) = return op
+castValues op (IntegerType 32) (IntegerType 32) = return op
+castValues op (FloatingPointType DoubleFP) (FloatingPointType DoubleFP) = return op
+castValues op (NamedTypeReference _) (NamedTypeReference _) = return op
+castValues op (FunctionType _ _ _) (FunctionType _ _ _) = return op
+castValues op (IntegerType n) (IntegerType 1) = icmp IP.NE op $ ConstantOperand $ C.Int n 0
+castValues op (IntegerType 1) (IntegerType n) = sext op (IntegerType n)
+castValues op (IntegerType n) (FloatingPointType DoubleFP) = sitofp op floatType
+castValues op (FloatingPointType DoubleFP) (IntegerType n) = fptosi op (IntegerType n)
+
+
+createGlobal :: MonadModuleBuilder m => Name -> ASTL.Type -> IRBuilderT m Operand
+createGlobal n VoidType = global n VoidType $ C.AggregateZero VoidType
+createGlobal n (IntegerType i) = global n (IntegerType i) $ C.Int i 0
+createGlobal n (FloatingPointType DoubleFP) = global n floatType $ C.Float $ F.Double 0
+createGlobal n (NamedTypeReference _) = global n VoidType $ C.AggregateZero VoidType
+createGlobal n funcType@(FunctionType retType aT vA) = global n funcType $ C.Undef funcType
 
 
 convertVariable :: MonadModuleBuilder m => Value -> Expression -> CurrentVariables -> IRBuilderT m (Operand, CurrentVariables)
@@ -135,19 +173,21 @@ convertVariable (Var Global n t) expr vars = do
     (res, (gv, lv)) <- convertExpression expr vars
     sol <- isGlobalExisting n gv
     case sol of
-        Just op -> do
-            store op 0 res
+        Just (op, exT) -> do
+            casted <- castValues res exT $ getASTLType t
+            store op 0 casted
             return (op, (gv, lv))
         Nothing -> do
-            op <- global (fromString n) floatType $ C.Float $ F.Double 0
+            op <- createGlobal (fromString n) (getASTLType t)
             store op 0 res
             return (op, ([(getASTLType t, n, op)] ++ gv, lv))
 convertVariable (Var Local n t) expr vars = do
     (res, (gv, lv)) <- convertExpression expr vars
     sol <- isLocalExisting n lv
     case sol of
-        Just op -> do
-            store op 0 res
+        Just (op, exT) -> do
+            casted <- castValues res exT $ getASTLType t
+            store op 0 casted
             return (op, (gv, lv))
         Nothing -> do
             op <- alloca (getASTLType t) Nothing 0
@@ -170,7 +210,9 @@ convertUnaryOpCons (BoolNot:xs) val = do
 convertUnaryOpCons (_:xs) val = convertUnaryOpCons xs val
 
 convertValue :: MonadModuleBuilder m => Value -> CurrentVariables -> IRBuilderT m Operand
-convertValue (Nbr n) _ = CB.double $ fromIntegral n
+convertValue (Nbr n) _ = CB.int32 $ fromIntegral n
+convertValue (Boolean True) _ = CB.bit 1
+convertValue (Boolean False) _ = CB.bit 0
 convertValue (RealNbr n) _ = CB.double n
 convertValue (Var _ n _) vars = lookupVariable n vars
 convertValue (AST.Call (Proto name params retType) args) vars = do
@@ -186,10 +228,15 @@ convertExpression (Unary opt val) vars = do
     op <- convertValue val vars
     newOp <- convertUnaryOpCons (reverse opt) op
     return $ (newOp, vars)
+convertExpression (Cast tb ta expr) vars = do
+    (op, newVars) <- convertExpression expr vars
+    castValues op (getASTLType tb) (getASTLType ta)
 convertExpression (Expr (Unary [] val) AST.Asg expr) vars = convertVariable val expr vars
 convertExpression (Fct (Decl proto expr)) (gv, lv) = do
     op <- convertFunction proto expr gv
     return $ (op, (gv, lv))
+
+-- CLASSIC CALCULATIONS --
 convertExpression (Expr firstExpr AST.Add secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
@@ -210,10 +257,71 @@ convertExpression (Expr firstExpr AST.Mod secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
     fmap (\s -> (s, nVars)) $ frem leftOp rightOp
+convertExpression (Expr firstExpr AST.Pow secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    let fctOp = (ConstantOperand $ C.GlobalReference (FunctionType floatType ([floatType, floatType]) False) $ fromString "pow")
+    let params = [(leftOp, []), (rightOp, [])]
+    fmap (\s -> (s, nVars)) $ call fctOp params
+
+
+-- BINARY CALCULATIONS --
+convertExpression (Expr firstExpr AST.And secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.and leftOp rightOp
+convertExpression (Expr firstExpr AST.Or secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.or leftOp rightOp
+convertExpression (Expr firstExpr AST.Xor secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ LLVM.IRBuilder.Instruction.xor leftOp rightOp
+
+-- COMPARISONS --
 convertExpression (Expr firstExpr AST.Equ secExpr) vars = do
     (leftOp, newVars) <- convertExpression firstExpr vars
     (rightOp, nVars) <- convertExpression secExpr newVars
     fmap (\s -> (s, nVars)) $ fcmp FPP.UEQ leftOp rightOp
+convertExpression (Expr firstExpr AST.Neq secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ fcmp FPP.UNE leftOp rightOp
+convertExpression (Expr firstExpr AST.Gt secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ fcmp FPP.UGT leftOp rightOp
+convertExpression (Expr firstExpr AST.Gte secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ fcmp FPP.UGE leftOp rightOp
+convertExpression (Expr firstExpr AST.Lt secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ fcmp FPP.ULT leftOp rightOp
+convertExpression (Expr firstExpr AST.Lte secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    fmap (\s -> (s, nVars)) $ fcmp FPP.ULE leftOp rightOp
+convertExpression (Expr firstExpr AST.BAnd secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    case leftOp of
+        (ConstantOperand $ C.Int 1 1) -> case rightOp of
+            (ConstantOperand $ C.Int 1 1) -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
+            _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
+        _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
+convertExpression (Expr firstExpr AST.BOr secExpr) vars = do
+    (leftOp, newVars) <- convertExpression firstExpr vars
+    (rightOp, nVars) <- convertExpression secExpr newVars
+    case leftOp of
+        (ConstantOperand $ C.Int 1 0) -> case rightOp of
+            (ConstantOperand $ C.Int 1 0) -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 0)
+            _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
+        _ -> fmap (\s -> (s, nVars)) $ (ConstantOperand $ C.Int 1 1)
+
+-- IF EXPR --
 convertExpression ex@(IfExpr expr thenExpr elseExpr) vars@(_, lv) = do
     endF <- freshName $ fromString "end"
     (op, gv) <- convertIfExpr ex vars endF
@@ -222,11 +330,12 @@ convertExpression ex@(IfExpr expr thenExpr elseExpr) vars@(_, lv) = do
 
 makeASTModule :: String -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
-    function "main" [] double $ \_ -> do
+    function "main" [] i32 $ \_ -> do
         value <- CB.int32 $ 0
         ret $ value
 makeASTModule name exprs = buildModule (fromString name) $ do
-    function "main" [] double $ \_ -> do
+    extern (fromString "pow") [floatType, floatType] floatType
+    function "main" [] i32 $ \_ -> do
         entry <- freshName $ fromString "entry"
         emitBlockStart entry
         (operand, gv) <- executeExpressionsConversion ([], []) exprs

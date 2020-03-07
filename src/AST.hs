@@ -29,6 +29,7 @@ data Type =
 instance Show Type where
     show Void = "void"
     show IntegerVar = "int"
+    show BooleanVar = "bool"
     show FloatingVar = "double"
     show (UnknownType s) = s
     show (Function proto) = show proto
