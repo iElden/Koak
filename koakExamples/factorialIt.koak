@@ -3,9 +3,9 @@ def factorialIt(n: int): int {
     local result: int = 1
 
     while (n != 0) {
-    	result = result * count
-	    count = count + 1
-	    n = n - 1
+        result = result * count
+        count = count + 1
+        n = n - 1
     }
     result
 }
