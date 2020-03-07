@@ -55,11 +55,15 @@ isOpValid Or  IntegerVar IntegerVar = True
 isOpValid Xor IntegerVar IntegerVar = True
 isOpValid RSh IntegerVar IntegerVar = True
 isOpValid LSh IntegerVar IntegerVar = True
+isOpValid BAnd BooleanVar BooleanVar = True
+isOpValid BOr BooleanVar BooleanVar = True
 isOpValid And _ _ = False
 isOpValid Or  _ _ = False
 isOpValid Xor _ _ = False
 isOpValid RSh _ _ = False
 isOpValid LSh _ _ = False
+isOpValid BAnd _ _ = False
+isOpValid BOr _ _ = False
 isOpValid _ (UnknownType _) (UnknownType _) = False
 isOpValid _ t1 t2 = t1 == t2
 
@@ -126,7 +130,7 @@ getExpressionType expr@(Fct (Decl (Proto name _ retType) exprs))= case fmap sequ
         else
             (msgs ++ [Error $ "Couldn't match expected type " ++ show retType ++ " with actual type " ++ show (last var), getExpr $ last exprs], Nothing)
 
-getExpressionType (Cast t _)                            = ([], Just t)
+getExpressionType (Cast _ t _)                          = ([], Just t)
 getExpressionType (Extern name t)                       = ([], Just Void)
 getExpressionType expr@(Unary _ (GlobVar n))            = ([Error $ "Cannot get type of " ++ show expr, getExpr expr], Nothing)
 getExpressionType expr@(Unary _ (GlobCall n args))      = ([Error $ "Cannot get type of " ++ show expr, getExpr expr], Nothing)
@@ -188,8 +192,10 @@ checkExpression inFct scope (Expr (Unary ops val@(Var _ v t)) Asg expr) = case c
     va -> va
 checkExpression _ scope expr@(Expr val Asg _) = (([Error "Unexpected identifier '='", getExpr expr], Nothing), scope)
 
-checkExpression inFct scope expr@(Cast t ex) = case checkExpression inFct scope ex of
-    ((msgs, Just x), newScope) -> ((msgs, Just $ Cast t x), newScope)
+checkExpression inFct scope expr@(Cast _ t ex) = case checkExpression inFct scope ex of
+    ((msgs, Just x), newScope) -> case getExpressionType x of
+        (msgs2, Just t2) -> ((msgs ++ msgs2, Just $ Cast t2 t x), newScope)
+        (msgs2, Nothing) -> ((msgs ++ msgs2, Nothing), newScope)
     va -> va
 
 checkExpression _ scope expr@(Extern name (Function (Proto _ args retType))) = (([], Just expr), (name, (Var Global name (Function (Proto name args retType)))):scope)

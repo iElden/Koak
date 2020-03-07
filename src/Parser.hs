@@ -242,7 +242,7 @@ parseWhile = WhileExpr <$>
     (many parseWhiteSpace *> parseChar "{" *> many parseWhiteSpace *> many (parseExpression <* some parseWhiteSpace) <* many parseWhiteSpace <* parseChar "}")
 
 parseCast :: Parser Expression
-parseCast = Cast <$> (parseCharSequence "cast<" *> parseType <* parseCharSequence ">") <*> (parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")")
+parseCast = Cast (UnknownType "") <$> (parseCharSequence "cast<" *> parseType <* parseCharSequence ">") <*> (parseChar "(" *> many parseWhiteSpace *> parseExpression <* many parseWhiteSpace <* parseChar ")")
 
 parseExtern :: Parser Expression
 parseExtern = Extern <$> (parseCharSequence "extern" *> many parseWhiteSpace *> ((:) <$> parseAlpha <*> many parseAlphaNum)) <*> (many parseWhiteSpace *> parseChar ":" *> many parseWhiteSpace *> parseType)

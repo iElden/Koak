@@ -31,6 +31,7 @@ instance Show Type where
     show IntegerVar = "int"
     show BooleanVar = "bool"
     show FloatingVar = "double"
+    show BooleanVar = "bool"
     show (UnknownType s) = s
     show (Function proto) = show proto
 
@@ -65,6 +66,8 @@ instance Show BinaryOp where
     show Div = "/"
     show And = "&"
     show Or = "|"
+    show BAnd = "&&"
+    show BOr = "||"
     show Xor = "^"
     show Pow = "**"
     show Mod = "%"
@@ -145,7 +148,7 @@ data Expression =
     IfExpr Expression [Expression] (Maybe [Expression]) |
     WhileExpr Expression [Expression] |
     Unary [UnaryOp] Value |
-    Cast Type Expression |
+    Cast Type Type Expression |
     Extern String Type
     deriving Eq
 
@@ -156,5 +159,5 @@ instance Show Expression where
     show (Expr unary op expr) = "(" ++ show unary ++ ") " ++ show op ++ " (" ++ show expr ++ ")"
     show (Fct fct) = show fct
     show (Unary ops v) = dispList "" ops ++ show v
-    show (Cast t e) = "cast<" ++ show t ++ ">(" ++ show e ++ ")"
+    show (Cast _ t e) = "cast<" ++ show t ++ ">(" ++ show e ++ ")"
     show (Extern name t) = "extern " ++ name ++ ": " ++ show t
