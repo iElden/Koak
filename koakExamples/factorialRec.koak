@@ -6,4 +6,5 @@ def factorialRec(n: int): int {
     } else {
         result = n * factorialRec(n - 1)
     }
+    result
 }
