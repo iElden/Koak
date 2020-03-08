@@ -5,3 +5,5 @@ koak
 dist-newstyle/
 *.ll
 *.o
+*.bc
+a.out

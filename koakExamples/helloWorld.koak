@@ -1,21 +1,15 @@
 extern putchar: (char: int): int
 
-local i : double = 0.
-
-while (i < 10.) {
-    putchar('H')
-    putchar('e')
-    putchar('l')
-    putchar('l')
-    putchar('o')
-    putchar(' ')
-    putchar('W')
-    putchar('o')
-    putchar('r')
-    putchar('l')
-    putchar('d')
-    putchar('!')
-    putchar(10)
-    i = i + 1.
-}
-cast<int>(i)
+putchar('H')
+putchar('e')
+putchar('l')
+putchar('l')
+putchar('o')
+putchar(' ')
+putchar('W')
+putchar('o')
+putchar('r')
+putchar('l')
+putchar('d')
+putchar('!')
+putchar(10)
