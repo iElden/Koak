@@ -149,13 +149,13 @@ getExpressionType v@(Expr expr1 op expr2) = case getExpressionType expr1 of
 getExpressionType (Fct (Decl (Proto name _ Void) exprs)) = case fmap sequence $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
     (msgs, Nothing) -> (msgs, Nothing)
     (msgs, Just _) -> (msgs, Just Void)
-getExpressionType expr@(Fct (Decl (Proto name _ retType) exprs))= case fmap sequence $ foldl (\(a, b)(c, d) -> (a ++ c, d:b)) ([], []) $ fmap getExpressionType exprs of
+getExpressionType expr@(Fct (Decl (Proto name _ retType) exprs))= case fmap sequence $ foldl (\(a, b)(c, d) -> (a ++ c, b ++ [d])) ([], []) $ fmap getExpressionType exprs of
     (msgs, Nothing) -> (msgs, Nothing)
     (msgs, Just []) -> (msgs ++ [Error "Non-void function must return a value", getExpr expr], Nothing)
     (msgs, Just var) -> if last var == retType then
             (msgs, Just Void)
         else
-            (msgs ++ [Error $ "Couldn't match expected type " ++ show retType ++ " with actual type " ++ show (last var), getExpr $ last exprs], Nothing)
+            (msgs ++ [Error $ "Couldn't match expected type " ++ show retType ++ " with actual type " ++ show (last var), Info $ "In return value for function " ++ name, getExpr $ last exprs], Nothing)
 
 getExpressionType (Cast _ t _)                          = ([], Just t)
 getExpressionType (Extern name t)                       = ([], Just Void)

@@ -54,6 +54,7 @@ lookupVariable n (gv, ((t, name, op):xs))
             load operand 0
         Nothing -> return $ LocalReference t (fromString n)
     | otherwise = lookupVariable n (gv, xs)
+lookupVariable n _ = error $ "No variable " ++ n ++ " was found"
 
 isGlobalExisting :: MonadModuleBuilder m => VarName -> GlobalVariables -> IRBuilderT m (Maybe (Operand, ASTL.Type))
 isGlobalExisting n [] = return Nothing
