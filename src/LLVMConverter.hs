@@ -7,6 +7,8 @@ import AST
 import TypeInfer
 import Data.Text.Lazy.IO as T
 import Data.Tuple
+import Data.Functor.Identity
+
 
 import LLVM.Pretty  -- from the llvm-hs-pretty package
 import LLVM.AST hiding (function)
@@ -402,6 +404,31 @@ convertExpression ex@(WhileExpr expr body) vars@(_, lv) = do
 -- CRASH --
 convertExpression expr _ = error $ "Unimplemented expression '" ++ show expr ++ "'"
 
+createFunctionsWithoutMain :: Monad m => [Expression] -> ModuleBuilderT m Operand
+createFunctionsWithoutMain (x:[]) = case x of
+    (Fct (Decl (Proto name args retType) exprs)) -> function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
+        entry <- freshName $ fromString "entry"
+        emitBlockStart entry
+        (op, lv) <- initLocalVariables [] $ getFunctionParameters args
+        (operand, gv) <- executeExpressionsConversion ([], lv) exprs
+        ret operand
+    (Extern name (AST.Function (Proto _ args retType))) -> do
+        let types = fst $ unzip $ getFunctionParameters args
+        extern (fromString name) types $ getASTLType retType
+createFunctionsWithoutMain (x:xs) = case x of
+    (Fct (Decl (Proto name args retType) exprs)) -> do
+        function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
+            entry <- freshName $ fromString "entry"
+            emitBlockStart entry
+            (op, lv) <- initLocalVariables [] $ getFunctionParameters args
+            (operand, gv) <- executeExpressionsConversion ([], lv) exprs
+            ret operand
+        createFunctionsWithoutMain xs
+    (Extern name (AST.Function (Proto _ args retType))) -> do
+         let types = fst $ unzip $ getFunctionParameters args
+         extern (fromString name) types $ getASTLType retType
+         createFunctionsWithoutMain xs
+
 makeASTModule :: ModuleName -> [Expression] -> Module
 makeASTModule name [] = buildModule (fromString name) $ do
     function "main" [] i32 $ \_ -> do
@@ -410,11 +437,7 @@ makeASTModule name [] = buildModule (fromString name) $ do
 makeASTModule name exprs = buildModule (fromString name) $ do
     extern (fromString "pow") [floatType, floatType] floatType
     case filter isReleventExpression exprs of
-        [] -> function "@@" [] i32 $ \_ -> do
-            entry <- freshName $ fromString "entry"
-            emitBlockStart entry
-            (operand, gv) <- executeExpressionsConversion ([], []) exprs
-            ret operand
+        [] -> createFunctionsWithoutMain exprs
         _ -> function "main" [] i32 $ \_ -> do
             entry <- freshName $ fromString "entry"
             emitBlockStart entry
