@@ -404,7 +404,7 @@ convertExpression ex@(WhileExpr expr body) vars@(_, lv) = do
 -- CRASH --
 convertExpression expr _ = error $ "Unimplemented expression '" ++ show expr ++ "'"
 
---createFunctionsWithoutMain :: Monad m => [Expression] -> IRBuilder
+createFunctionsWithoutMain :: Monad m => [Expression] -> ModuleBuilderT m Operand
 createFunctionsWithoutMain (x:[]) = case x of
     (Fct (Decl (Proto name args retType) exprs)) -> function (fromString name) (fmap (fmap fromString) $ getFunctionParameters args) (getASTLType retType) $ \_ -> do
         entry <- freshName $ fromString "entry"
